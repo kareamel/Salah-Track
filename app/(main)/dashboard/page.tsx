@@ -1,94 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import Link from "next/link";
+import { Check, Flame, Moon, Trophy, UserRound } from "lucide-react";
+import { card, enter } from "@/components/salahtrack/ui";
 import {
-  Check,
-  CloudSun,
-  Flame,
-  History,
-  Home,
-  Moon,
-  Nfc,
-  Settings,
-  Sun,
-  Sunrise,
-  Sunset,
-  Trophy,
-  UserRound,
-  type LucideIcon,
-} from "lucide-react";
-
-/* -------------------------------------------------------------------------- */
-/*  Temporary demonstration data                                              */
-/*  (This will be replaced with real data from Supabase in a later step.)     */
-/* -------------------------------------------------------------------------- */
-
-type PrayerName = "Fajr" | "Dhuhr" | "Asr" | "Maghrib" | "Isha";
-
-type Prayer = {
-  name: PrayerName;
-  arabic: string;
-  time: string;
-  icon: LucideIcon;
-};
-
-const PRAYERS: Prayer[] = [
-  { name: "Fajr", arabic: "الفجر", time: "05:12", icon: Sunrise },
-  { name: "Dhuhr", arabic: "الظهر", time: "12:48", icon: Sun },
-  { name: "Asr", arabic: "العصر", time: "16:05", icon: CloudSun },
-  { name: "Maghrib", arabic: "المغرب", time: "18:31", icon: Sunset },
-  { name: "Isha", arabic: "العشاء", time: "19:52", icon: Moon },
-];
-
-const TOTAL_PRAYERS = PRAYERS.length;
-
-// Which prayers start as "already confirmed" when the page loads.
-const DEMO_COMPLETED: Record<PrayerName, boolean> = {
-  Fajr: true,
-  Dhuhr: true,
-  Asr: false,
-  Maghrib: false,
-  Isha: false,
-};
-
-// Prayers completed on each of the previous 6 days (oldest first, yesterday last).
-const DEMO_PREVIOUS_DAYS = [4, 5, 5, 5, 5, 5];
-
-// Consecutive days (up to yesterday) where all 5 prayers were completed.
-const DEMO_STREAK = 5;
-const DEMO_BEST_STREAK = 21;
-
-/* -------------------------------------------------------------------------- */
-/*  Shared styles                                                             */
-/* -------------------------------------------------------------------------- */
-
-// Gentle "fade up" entrance animation (from tailwindcss-animate, already installed).
-const enter =
-  "animate-in fade-in slide-in-from-bottom-3 duration-500 fill-mode-both motion-reduce:animate-none";
-
-const card = "rounded-3xl bg-white p-5 shadow-sm ring-1 ring-stone-200/70";
+  DEMO_BEST_STREAK,
+  DEMO_MISSED_BY_DAY,
+  DEMO_STREAK,
+  DEMO_TODAY_COMPLETED,
+  PRAYERS,
+  TOTAL_PRAYERS,
+  type Prayer,
+  type PrayerName,
+} from "@/lib/demo-data";
+import { daysBefore, useToday } from "@/lib/use-today";
 
 /* -------------------------------------------------------------------------- */
 /*  Page                                                                      */
 /* -------------------------------------------------------------------------- */
 
 export default function DashboardPage() {
-  const [completed, setCompleted] = useState(DEMO_COMPLETED);
-  const [toast, setToast] = useState<string | null>(null);
-
-  // The date is read in the browser (not on the server) so it always matches
-  // the user's own time zone.
-  const [now, setNow] = useState<Date | null>(null);
-  useEffect(() => {
-    setNow(new Date());
-  }, []);
-
-  // Hide the "coming soon" message after 2 seconds.
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 2000);
-    return () => clearTimeout(timer);
-  }, [toast]);
+  const now = useToday();
+  const [completed, setCompleted] = useState(DEMO_TODAY_COMPLETED);
 
   const completedCount = PRAYERS.filter((p) => completed[p.name]).length;
   const allDone = completedCount === TOTAL_PRAYERS;
@@ -100,63 +34,39 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="relative min-h-dvh overflow-x-hidden bg-stone-50 text-stone-900">
-      {/* Soft emerald glow behind the header */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-gradient-to-b from-emerald-100/70 via-emerald-50/40 to-transparent"
+    <>
+      <Header />
+      <Welcome now={now} />
+
+      <ProgressCard
+        completedCount={completedCount}
+        allDone={allDone}
+        nextPrayer={nextPrayer}
       />
 
-      <main className="relative mx-auto flex max-w-md flex-col gap-6 px-5 pb-36 pt-6">
-        <Header />
-        <Welcome now={now} />
-
-        <ProgressCard
-          completedCount={completedCount}
-          allDone={allDone}
-          nextPrayer={nextPrayer}
-        />
-
-        <section className={`${enter} delay-200`}>
-          <div className="mb-3 flex items-baseline justify-between px-1">
-            <h2 className="text-lg font-semibold tracking-tight">
-              Today&apos;s prayers
-            </h2>
-            <span className="text-sm text-stone-500">
-              Tap to confirm
-            </span>
-          </div>
-          <ul className="flex flex-col gap-3">
-            {PRAYERS.map((prayer) => (
-              <PrayerRow
-                key={prayer.name}
-                prayer={prayer}
-                done={completed[prayer.name]}
-                isNext={nextPrayer?.name === prayer.name}
-                onToggle={() => togglePrayer(prayer.name)}
-              />
-            ))}
-          </ul>
-        </section>
-
-        <StreakCard streak={streak} allDone={allDone} />
-        <WeeklyCard now={now} todayCount={completedCount} />
-      </main>
-
-      {/* "Coming soon" message for navigation items that don't exist yet */}
-      {toast && (
-        <div
-          role="status"
-          className="fixed inset-x-0 bottom-28 z-50 flex justify-center px-5"
-        >
-          <div className="animate-in fade-in slide-in-from-bottom-2 rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-white shadow-lg duration-300">
-            {toast}
-          </div>
+      <section className={`${enter} delay-200`}>
+        <div className="mb-3 flex items-baseline justify-between px-1">
+          <h2 className="text-lg font-semibold tracking-tight">
+            Today&apos;s prayers
+          </h2>
+          <span className="text-sm text-stone-500">Tap to confirm</span>
         </div>
-      )}
+        <ul className="flex flex-col gap-3">
+          {PRAYERS.map((prayer) => (
+            <PrayerRow
+              key={prayer.name}
+              prayer={prayer}
+              done={completed[prayer.name]}
+              isNext={nextPrayer?.name === prayer.name}
+              onToggle={() => togglePrayer(prayer.name)}
+            />
+          ))}
+        </ul>
+      </section>
 
-      <BottomNav onComingSoon={(label) => setToast(`${label} is coming soon`)} />
-    </div>
+      <StreakCard streak={streak} allDone={allDone} />
+      <WeeklyCard now={now} todayCount={completedCount} />
+    </>
   );
 }
 
@@ -175,13 +85,13 @@ function Header() {
           Salah<span className="text-emerald-600">Track</span>
         </span>
       </div>
-      <button
-        type="button"
-        aria-label="Profile"
+      <Link
+        href="/settings"
+        aria-label="Profile and settings"
         className="grid size-10 place-items-center rounded-full bg-white text-stone-500 shadow-sm ring-1 ring-stone-200/70 transition active:scale-95"
       >
         <UserRound className="size-5" />
-      </button>
+      </Link>
     </header>
   );
 }
@@ -466,17 +376,17 @@ function StreakCard({ streak, allDone }: { streak: number; allDone: boolean }) {
 /* -------------------------------------------------------------------------- */
 
 function WeeklyCard({ now, todayCount }: { now: Date | null; todayCount: number }) {
-  // The last 7 days: 6 demo days + today's live count.
-  const counts = [...DEMO_PREVIOUS_DAYS, todayCount];
+  // The last 7 days, oldest first: 6 demo days + today's live count.
+  const previousDays = DEMO_MISSED_BY_DAY.slice(0, 6)
+    .map((missed) => TOTAL_PRAYERS - missed.length)
+    .reverse();
+  const counts = [...previousDays, todayCount];
 
   const days = counts.map((count, i) => {
     const daysAgo = counts.length - 1 - i;
-    let label = "";
-    if (now) {
-      const date = new Date(now);
-      date.setDate(now.getDate() - daysAgo);
-      label = date.toLocaleDateString("en-GB", { weekday: "short" });
-    }
+    const label = now
+      ? daysBefore(now, daysAgo).toLocaleDateString("en-GB", { weekday: "short" })
+      : "";
     return { count, label, isToday: daysAgo === 0 };
   });
 
@@ -544,63 +454,5 @@ function Stat({ value, label }: { value: string; label: string }) {
       <p className="text-base font-semibold tabular-nums">{value}</p>
       <p className="text-xs text-stone-500">{label}</p>
     </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Bottom navigation                                                         */
-/* -------------------------------------------------------------------------- */
-
-const NAV_ITEMS: { label: string; icon: LucideIcon }[] = [
-  { label: "Home", icon: Home },
-  { label: "History", icon: History },
-  { label: "Scan", icon: Nfc },
-  { label: "Settings", icon: Settings },
-];
-
-function BottomNav({ onComingSoon }: { onComingSoon: (label: string) => void }) {
-  return (
-    <nav
-      aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(env(safe-area-inset-bottom),16px)]"
-    >
-      <div className="mx-auto flex max-w-md items-center justify-around rounded-[28px] bg-white/85 p-2 shadow-xl shadow-stone-900/10 ring-1 ring-stone-200/80 backdrop-blur-xl">
-        {NAV_ITEMS.map(({ label, icon: Icon }) => {
-          const active = label === "Home";
-          const isScan = label === "Scan";
-
-          return (
-            <button
-              key={label}
-              type="button"
-              aria-current={active ? "page" : undefined}
-              onClick={() => !active && onComingSoon(label)}
-              className="group flex flex-1 flex-col items-center gap-1 rounded-2xl py-1.5 transition active:scale-95"
-            >
-              <span className="flex h-10 items-center">
-                <span
-                  className={`grid place-items-center rounded-2xl transition-colors ${
-                    isScan
-                      ? "size-10 bg-gradient-to-br from-emerald-500 to-emerald-700 text-white shadow-md shadow-emerald-700/30"
-                      : active
-                        ? "h-8 w-14 bg-emerald-100 text-emerald-700"
-                        : "h-8 w-14 text-stone-400 group-hover:text-stone-600"
-                  }`}
-                >
-                  <Icon className="size-5" />
-                </span>
-              </span>
-              <span
-                className={`text-[11px] font-medium ${
-                  active ? "text-emerald-700" : "text-stone-500"
-                }`}
-              >
-                {label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </nav>
   );
 }
