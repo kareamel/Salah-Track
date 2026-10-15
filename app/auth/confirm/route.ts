@@ -3,28 +3,47 @@ import { type EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { type NextRequest } from "next/server";
 
+const DEFAULT_NEXT = "/dashboard";
+
+// Only allow redirects to pages inside this app (e.g. "/dashboard"). Anything
+// that would leave the site, such as "https://evil.example" or
+// "//evil.example", falls back to the dashboard.
+function safeNextPath(next: string | null, origin: string) {
+  if (!next) return DEFAULT_NEXT;
+  try {
+    const url = new URL(next, origin);
+    if (url.origin !== origin) return DEFAULT_NEXT;
+    return url.pathname + url.search + url.hash;
+  } catch {
+    return DEFAULT_NEXT;
+  }
+}
+
+function errorPage(message: string) {
+  return `/auth/error?error=${encodeURIComponent(message)}`;
+}
+
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
+  const { searchParams, origin } = request.nextUrl;
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/";
+  const code = searchParams.get("code");
+  const next = safeNextPath(searchParams.get("next"), origin);
 
+  // Link from an email template that uses {{ .TokenHash }}.
   if (token_hash && type) {
     const supabase = await createClient();
-
-    const { error } = await supabase.auth.verifyOtp({
-      type,
-      token_hash,
-    });
-    if (!error) {
-      // redirect user to specified redirect URL or root of app
-      redirect(next);
-    } else {
-      // redirect the user to an error page with some instructions
-      redirect(`/auth/error?error=${error?.message}`);
-    }
+    const { error } = await supabase.auth.verifyOtp({ type, token_hash });
+    redirect(error ? errorPage(error.message) : next);
   }
 
-  // redirect the user to an error page with some instructions
-  redirect(`/auth/error?error=No token hash or type`);
+  // Link from Supabase's default email template ({{ .ConfirmationURL }}),
+  // which sends the user back here with a one-time ?code=.
+  if (code) {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    redirect(error ? errorPage(error.message) : next);
+  }
+
+  redirect(errorPage("No token hash or code"));
 }

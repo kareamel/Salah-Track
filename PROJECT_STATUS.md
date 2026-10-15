@@ -1,6 +1,6 @@
 # SalahTrack: Project Status
 
-_Last updated: 15 October 2026 · Latest commit before this update: `6f994d2`_
+_Last updated: 15 October 2026 · Latest commit before this update: `dd7d7e9`_
 
 SalahTrack is a mobile-first, NFC-enabled Islamic prayer tracking web app.
 The frontend is built and runs on sample data. **The app is now connected to
@@ -16,7 +16,7 @@ the Supabase project "Salah-Track"** (verified). No database tables exist yet.
 | Data | ⚠️ Sample data only (`lib/demo-data.ts`), nothing is saved |
 | Supabase project connected | ✅ Yes: `Salah-Track`, verified 15 October 2026 |
 | Environment variables | ✅ Set in `.env.local` (Git-ignored, not committed) |
-| Authentication | 🟡 Active (starter email + password flow), **not yet tested with a real account**. Redirect fixes are pending (see §5). |
+| Authentication | 🟡 Active (email + password). Redirect fixes are done (§5). **Not yet tested with a real account.** |
 | App pages while logged out | ⚠️ Redirect to `/auth/login` (expected, see §5.1) |
 | Database tables | ❌ None yet (intentional) |
 | NFC | ❌ Not started (Scan screen is visual only) |
@@ -148,46 +148,59 @@ works or they are made public.
 Database tables: none. There is no `supabase/` folder (no Supabase CLI
 migrations yet).
 
-### 4.6 Authentication flows (starter, now active, untested)
+### 4.6 Authentication flows (active, untested with a real account)
 
-| Feature | Location | Supabase call |
-| --- | --- | --- |
-| Sign up (sends confirmation email) | `app/auth/sign-up`, `components/sign-up-form.tsx` | `auth.signUp` (redirects to `/protected`) |
-| Email confirmation link handler | `app/auth/confirm/route.ts` | `auth.verifyOtp` |
-| Log in | `app/auth/login`, `components/login-form.tsx` | `auth.signInWithPassword` |
-| Forgot / reset password | `app/auth/forgot-password`, `app/auth/update-password` | `auth.resetPasswordForEmail`, `auth.updateUser` |
-| Log out | `components/logout-button.tsx` | `auth.signOut` |
-| Example protected page | `app/protected` | `auth.getClaims` |
-| Route protection | `lib/supabase/proxy.ts` | `auth.getClaims` |
+| Feature | Location | Supabase call | Where the user ends up |
+| --- | --- | --- | --- |
+| Sign up (sends confirmation email) | `app/auth/sign-up`, `components/sign-up-form.tsx` | `auth.signUp` | Email link → `/auth/confirm?next=/dashboard` → `/dashboard` |
+| Email link handler | `app/auth/confirm/route.ts` | `auth.exchangeCodeForSession` (default email template) or `auth.verifyOtp` (`{{ .TokenHash }}` template) | Validated `next` path, default `/dashboard` |
+| Log in | `app/auth/login`, `components/login-form.tsx` | `auth.signInWithPassword` | `/dashboard` |
+| Forgot password | `app/auth/forgot-password`, `components/forgot-password-form.tsx` | `auth.resetPasswordForEmail` | Email link → `/auth/confirm?next=/auth/update-password` |
+| Set new password | `app/auth/update-password`, `components/update-password-form.tsx` | `auth.updateUser` | `/dashboard` |
+| Log out | `components/logout-button.tsx` | `auth.signOut` | `/auth/login` |
+| Example protected page (starter) | `app/protected` | `auth.getClaims` | Unused by SalahTrack, kept unchanged |
+| Route protection | `lib/supabase/proxy.ts` | `auth.getClaims` | Logged-out visitors → `/auth/login` |
 
-No account has been created yet. Account sign-up testing is deliberately on
-hold until the redirect issues in §5 are fixed.
+No account has been created yet. Sign-up testing is the next step (§8).
 
 ---
 
-## 5. Open issues to fix before testing sign-up
+## 5. Authentication redirect fixes (15 October 2026)
 
-1. **App pages require login.** `lib/supabase/proxy.ts` redirects logged-out
-   visitors to `/auth/login` on every route except `/` and `/auth/*`. This is
-   now **active**. Decide which pages should be public and which need an
-   account.
-2. **Sign-up lands on the starter page.** `emailRedirectTo` in
-   `components/sign-up-form.tsx` points to `/protected`. It should point to
-   `/dashboard`.
-3. **Open redirect in the starter.** `app/auth/confirm/route.ts` redirects to
-   the `next` query value without checking it. Restrict it to paths inside
-   the app.
-4. **Supabase dashboard URL settings.** Set **Site URL** and **Redirect URLs**
-   (Authentication → URL Configuration) to include `http://localhost:3000`
-   before testing confirmation emails.
-5. **Key and table security.** Only the publishable key is used in the app
-   (✅). Every future table needs **Row Level Security** turned on, with
-   per-user policies.
-6. **Unpinned versions.** `package.json` uses `"latest"` for `next`,
-   `@supabase/supabase-js` and `@supabase/ssr`. Consider pinning them.
-7. **No Git remote.** The repository exists only on this computer
-   (branch `master`). Consider pushing to a private GitHub repo as a backup.
-   `.env.local` will stay out of it automatically.
+| # | Issue | Status | What changed |
+| --- | --- | --- | --- |
+| 1 | App pages require login | ✅ Kept as intended | `/dashboard`, `/history`, `/scan` and `/settings` stay login-only because they will show each user's own data. `/` and `/auth/*` stay public. `lib/supabase/proxy.ts` is unchanged. |
+| 2 | Sign-up landed on the starter `/protected` page | ✅ Fixed | `emailRedirectTo` is now `/auth/confirm?next=/dashboard`. Login and password-update now go to `/dashboard`. |
+| 3 | Open redirect in `app/auth/confirm/route.ts` | ✅ Fixed | `next` is resolved against the app's own origin. Any value pointing to another site falls back to `/dashboard`. Error messages are now URL-encoded. |
+| 4 | Supabase URL settings | ✅ Done by project owner | Site URL `http://localhost:3000` and Redirect URL `http://localhost:3000/**` (set in the dashboard; not visible to the app, so confirmed by the owner) |
+| 5 | Email link format | ✅ Fixed | The confirm route now also accepts the `?code=` that Supabase's **default** email template sends, so no email-template edits are needed. `token_hash` links still work. The password-reset link now goes through the same route. |
+
+Verification:
+
+| Test | Result |
+| --- | --- |
+| TypeScript + ESLint | ✅ Pass |
+| `next` = `https://evil.example`, `//evil.example`, `/\evil.example`, `\\evil.example`, tab tricks, `javascript:` | ✅ All fall back to `/dashboard` |
+| `next` = `/dashboard`, `/auth/update-password`, `/history?x=1` | ✅ Allowed unchanged |
+| `/auth/confirm` with no / fake link | ✅ Redirects to `/auth/error` on the same site, message encoded |
+| `/`, `/auth/login`, `/auth/sign-up`, `/auth/forgot-password` | ✅ 200 |
+| `/dashboard`, `/settings` while logged out | ↪️ `/auth/login` (intended) |
+
+Remaining notes:
+
+- **Same browser for email links.** With the default email template, the
+  confirmation link should be opened in the same browser used to sign up.
+  Otherwise the user is shown an error page, but the email is still confirmed
+  and they can log in normally. Switching the template to `{{ .TokenHash }}`
+  later removes this limit.
+- **Key and table security.** Only the publishable key is used in the app
+  (✅). Every future table needs **Row Level Security** turned on, with
+  per-user policies.
+- **Unpinned versions.** `package.json` uses `"latest"` for `next`,
+  `@supabase/supabase-js` and `@supabase/ssr`. Consider pinning them.
+- **No Git remote.** The repository exists only on this computer
+  (branch `master`). Consider pushing to a private GitHub repo as a backup.
+  `.env.local` will stay out of it automatically.
 
 ---
 
@@ -206,6 +219,7 @@ prayer from that page.
 
 | Commit | Description |
 | --- | --- |
+| `dd7d7e9` | Update PROJECT_STATUS.md with verified Supabase connection |
 | `6f994d2` | Add PROJECT_STATUS.md with Supabase verification findings |
 | `8adc6ef` | Add working bottom navigation with History, Scan and Settings pages |
 | `0a90dbd` | Add SalahTrack dashboard with demo data |
@@ -218,10 +232,11 @@ prayer from that page.
 1. ~~Create a Supabase project~~ ✅
 2. ~~Create `.env.local` with URL and publishable key~~ ✅
 3. ~~Verify connectivity~~ ✅
-4. **Fix the auth redirects (§5.1 to §5.4):** choose public vs. protected
-   pages, point sign-up to `/dashboard`, validate the `next` redirect, and
-   set Site URL / Redirect URLs in the Supabase dashboard.
-5. **Test sign-up, email confirmation, login and logout** with a real account.
+4. ~~Fix the auth redirects~~ ✅ (§5)
+5. **Test sign-up, email confirmation, login and logout** with a real account
+   (project owner, in their own browser). Expected path: sign up →
+   "check your email" → click link → `/dashboard` → log out → `/auth/login`
+   → log in → `/dashboard`.
 6. **Agree on the database design** (with ChatGPT), e.g. profiles, prayer
    logs (user, date, prayer, confirmed at, source: button/NFC), NFC tags and
    settings, with Row Level Security on every table. Consider keeping the
