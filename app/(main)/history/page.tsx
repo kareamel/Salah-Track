@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Check, Sparkles, X } from "lucide-react";
 import { enter, PageHeader } from "@/components/salahtrack/ui";
-import { DEMO_MISSED_BY_DAY, PRAYERS, TOTAL_PRAYERS } from "@/lib/demo-data";
+import { DEMO_MISSED_BY_DAY } from "@/lib/demo-data";
+import { PRAYERS, TOTAL_PRAYERS } from "@/lib/prayers";
 import { daysBefore, useToday } from "@/lib/use-today";
 
 const RANGES = [7, 14] as const;
@@ -26,7 +27,10 @@ export default function HistoryPage() {
 
   return (
     <>
-      <PageHeader title="History" subtitle="Your prayers from previous days" />
+      <PageHeader
+        title="History"
+        subtitle="Sample data for now. Your real history is coming soon."
+      />
 
       {/* 7 days / 14 days switch */}
       <div

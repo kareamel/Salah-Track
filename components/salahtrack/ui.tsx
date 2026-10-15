@@ -7,6 +7,15 @@ export const enter =
 // A white rounded card.
 export const card = "rounded-3xl bg-white p-5 shadow-sm ring-1 ring-stone-200/70";
 
+// Small label for cards that still show example numbers, not real data.
+export function SampleBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200/80">
+      Sample data
+    </span>
+  );
+}
+
 export function PageHeader({
   title,
   subtitle,

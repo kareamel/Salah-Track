@@ -1,10 +1,12 @@
 # SalahTrack: Project Status
 
-_Last updated: 15 October 2026 · Latest commit before this update: `dd7d7e9`_
+_Last updated: 15 October 2026 · Latest commit before this update: `8cb2a3e`_
 
 SalahTrack is a mobile-first, NFC-enabled Islamic prayer tracking web app.
-The frontend is built and runs on sample data. **The app is now connected to
-the Supabase project "Salah-Track"** (verified). No database tables exist yet.
+It is connected to the Supabase project "Salah-Track". **The dashboard's
+daily prayer checklist now saves to and loads from the real
+`prayer_records` table.** Streaks, weekly stats and History still show
+clearly labelled sample data.
 
 ---
 
@@ -13,12 +15,13 @@ the Supabase project "Salah-Track"** (verified). No database tables exist yet.
 | Area | Status |
 | --- | --- |
 | Frontend (4 screens) | ✅ Built, committed and tested at iPhone size |
-| Data | ⚠️ Sample data only (`lib/demo-data.ts`), nothing is saved |
+| Dashboard: today's prayers | ✅ **Real data** from `public.prayer_records` (confirm → insert, undo → delete). Code checks pass; **live logged-in test pending** (§9). |
+| Streak, weekly chart, History page | ⚠️ Sample data, labelled "Sample data" in the app |
 | Supabase project connected | ✅ Yes: `Salah-Track`, verified 15 October 2026 |
 | Environment variables | ✅ Set in `.env.local` (Git-ignored, not committed) |
-| Authentication | 🟡 Active (email + password). Redirect fixes are done (§5). **Not yet tested with a real account.** |
-| App pages while logged out | ⚠️ Redirect to `/auth/login` (expected, see §5.1) |
-| Database tables | ❌ None yet (intentional) |
+| Authentication | 🟡 Active (email + password). Redirect fixes are done (§5). Real-account test pending. |
+| App pages while logged out | ↪️ Redirect to `/auth/login` (intended) |
+| Database tables | ✅ `public.prayer_records`, created by ChatGPT, RLS on (§9) |
 | NFC | ❌ Not started (Scan screen is visual only) |
 
 ---
@@ -47,8 +50,8 @@ does not appear in URLs.
 
 | URL | File | What it does |
 | --- | --- | --- |
-| `/dashboard` | `app/(main)/dashboard/page.tsx` | Greeting, Gregorian + Hijri date, progress ring (x/5), five prayers with Confirm/Done buttons, streak card, 7-day bar chart and stats |
-| `/history` | `app/(main)/history/page.tsx` | 7/14-day switch, completion %, perfect days, missed count, per-day prayer breakdown |
+| `/dashboard` | `app/(main)/dashboard/page.tsx` | Greeting, Gregorian + Hijri date, progress ring (x/5), five prayers with Confirm/Done buttons (**real data**, with confirmation dialog), streak card and 7-day chart (sample, labelled) |
+| `/history` | `app/(main)/history/page.tsx` | 7/14-day switch, completion %, perfect days, missed count, per-day prayer breakdown (sample, labelled in subtitle) |
 | `/scan` | `app/(main)/scan/page.tsx` | "Ready to scan" screen with animated scanning state and a "How it works" guide (no real NFC) |
 | `/settings` | `app/(main)/settings/page.tsx` | Guest profile card, reminder/Hijri/vibration switches, calculation method, version (not saved) |
 
@@ -58,15 +61,21 @@ Shared code:
 | --- | --- |
 | `app/(main)/layout.tsx` | Shared background, page width and bottom nav; sets page title "SalahTrack" |
 | `components/salahtrack/bottom-nav.tsx` | Bottom navigation (Home, History, Scan, Settings) with active-tab highlight |
-| `components/salahtrack/ui.tsx` | Shared animation/card styles and `PageHeader` |
-| `lib/demo-data.ts` | **All sample data**: prayer list, today's confirmations, 14 days of history, streaks. This is what the database will replace. |
-| `lib/use-today.ts` | Reads today's date in the browser (user's time zone) |
+| `components/salahtrack/ui.tsx` | Shared animation/card styles, `PageHeader`, `SampleBadge` |
+| `lib/prayers.ts` | The five prayers (names, Arabic, icons, sample times) |
+| `lib/prayer-records.ts` | Reads, adds and deletes the user's rows in `prayer_records`, with friendly error messages |
+| `lib/demo-data.ts` | Remaining **sample** statistics: 14 days of history and streak numbers |
+| `lib/use-today.ts` | Today's date in the user's time zone, updated after midnight. `toLocalDateString()` returns the local `YYYY-MM-DD` used for `prayer_date`. |
+| `supabase/schema/prayer_records.sql` | Reference copy of the table's schema. **Already applied, do not run.** |
 
 Behaviour notes:
 
-- Prayer confirmations, settings switches and the scan button use React state
-  only. Refreshing the page resets them.
+- Today's prayer confirmations are saved in Supabase. Settings switches and
+  the scan button are still visual only.
 - Prayer times are fixed sample values, not calculated for a location.
+- Settings still shows a "Guest" profile card even when logged in, and the
+  SalahTrack screens have no Log out button yet. Log out from the starter
+  home page (`/`).
 - The starter's home page (`/`) and root layout metadata were left unchanged.
 
 ---
@@ -145,8 +154,9 @@ works or they are made public.
 | `proxy.ts` | Next.js 16 proxy (formerly "middleware") that calls `updateSession` on all routes except static files |
 | `lib/utils.ts` | `hasEnvVars` check: Supabase features switch on now that both variables are set |
 
-Database tables: none. There is no `supabase/` folder (no Supabase CLI
-migrations yet).
+Database tables: `public.prayer_records` (see §9). The `supabase/` folder
+holds only a reference schema (`supabase/schema/`). There are no Supabase CLI
+migrations or config yet.
 
 ### 4.6 Authentication flows (active, untested with a real account)
 
@@ -219,6 +229,7 @@ prayer from that page.
 
 | Commit | Description |
 | --- | --- |
+| `8cb2a3e` | Fix auth redirects and open redirect in email confirm route |
 | `dd7d7e9` | Update PROJECT_STATUS.md with verified Supabase connection |
 | `6f994d2` | Add PROJECT_STATUS.md with Supabase verification findings |
 | `8adc6ef` | Add working bottom navigation with History, Scan and Settings pages |
@@ -237,10 +248,79 @@ prayer from that page.
    (project owner, in their own browser). Expected path: sign up →
    "check your email" → click link → `/dashboard` → log out → `/auth/login`
    → log in → `/dashboard`.
-6. **Agree on the database design** (with ChatGPT), e.g. profiles, prayer
-   logs (user, date, prayer, confirmed at, source: button/NFC), NFC tags and
-   settings, with Row Level Security on every table. Consider keeping the
-   schema as SQL migrations with the Supabase CLI.
-7. **Replace `lib/demo-data.ts`** with real reads and writes, one screen at a
-   time, starting with the dashboard confirmations.
-8. **NFC**, using the URL-on-tag approach above.
+6. ~~Create the first table (`prayer_records`)~~ ✅ (ChatGPT, §9)
+7. ~~Connect the dashboard's daily checklist to `prayer_records`~~ ✅ (§9)
+8. **Live test of the dashboard while logged in** (project owner, §9.4).
+9. **Real statistics:** streak, weekly chart and History from
+   `prayer_records`, replacing `lib/demo-data.ts`.
+10. **Settings/profile:** show the signed-in user instead of "Guest" and add
+    a Log out button inside SalahTrack.
+11. **Further tables** as agreed with ChatGPT (e.g. NFC tags, settings), with
+    RLS on every table. Consider moving to Supabase CLI migrations.
+12. **NFC**, using the URL-on-tag approach above.
+
+---
+
+## 9. Prayer records integration (15 October 2026)
+
+### 9.1 Database table (created by ChatGPT, not by this repo)
+
+`public.prayer_records`: `id` uuid PK · `user_id` uuid → `auth.users`,
+default `auth.uid()` · `prayer_date` date (required) · `prayer_name` text
+(Fajr/Dhuhr/Asr/Maghrib/Isha) · `completed_at` timestamptz default `now()`.
+One record per user + prayer + date. RLS is on. Authenticated users have
+SELECT/INSERT/DELETE on their own rows. No UPDATE. No anon access.
+
+Reference SQL: `supabase/schema/prayer_records.sql`. It was written from the
+specification and **not executed**. Constraint and policy names may differ
+from the live database.
+
+Checked from outside with the publishable key (no login):
+
+| Test | Result |
+| --- | --- |
+| Logged-out SELECT | 401 `42501` permission denied ✅ |
+| Logged-out INSERT | 401 `42501` permission denied ✅ (nothing written) |
+
+### 9.2 How the dashboard uses it
+
+| User action | What happens |
+| --- | --- |
+| Opens `/dashboard` | Loads the user's rows where `prayer_date` = today's **local** date. Skeleton rows show while loading. On failure, a friendly message with **Try again**. |
+| Taps **Confirm** on an incomplete prayer | Dialog: "Did you pray Asr?" Nothing is saved until **Yes, I prayed Asr** is tapped. |
+| Confirms | `INSERT { prayer_date, prayer_name }` (`user_id` filled by the database). The row turns green **only after** the database returns the saved record. |
+| Taps **Done** on a completed prayer | Dialog: "Remove Asr?" → `DELETE` by record `id`. The row reverts only after the database confirms the deletion. |
+| Duplicate (e.g. confirmed in another tab) | Unique violation `23505` → "This prayer is already recorded for today." The checklist reloads from the database. |
+| Undo of an already-deleted record | "That record was already removed." The checklist reloads. |
+| Session expired / not allowed (`42501`, `PGRST30x`) | "Your session has expired. Please log in again." |
+| Network problem | "Couldn't reach the server. Check your internet connection and try again." The dialog stays open so the user can retry. |
+| App left open past midnight | The date refreshes within a minute or when the tab regains focus, then today's records reload. |
+
+`prayer_date` comes from `toLocalDateString()` (`getFullYear`/`getMonth`/
+`getDate`). `toISOString()` is not used.
+
+### 9.3 Checks run
+
+| Check | Result |
+| --- | --- |
+| TypeScript (`tsc --noEmit`) | ✅ Pass |
+| ESLint | ✅ Pass |
+| Production build (`next build`) | ✅ Pass (18 routes) |
+| Local-date logic: London, Riyadh, New York, Sydney × 00:05 / 00:30 / 23:45 | ✅ 12/12 correct (`toISOString` was wrong in 6/12) |
+| Logged-out access to `/dashboard`, `/history` | ↪️ `/auth/login` (intended) |
+| Dev server log | ✅ No errors |
+
+### 9.4 Not yet verified (needs a logged-in account)
+
+The assistant cannot create accounts or sign in, so the end-to-end flow must
+be tested by the project owner:
+
+1. Log in → `/dashboard` shows 0 of 5 (the database has no records yet).
+2. Tap **Confirm** on Fajr → dialog → **Yes** → Fajr turns green, 1 of 5.
+3. Refresh the page → Fajr is still green.
+4. Log out (from `/`) and log back in → Fajr is still green.
+5. Tap **Done** on Fajr → **Remove record** → back to 0 of 5. Refresh to confirm.
+6. Optional: confirm Fajr in two tabs → the second shows the friendly
+   duplicate message.
+7. Optional: check the Supabase dashboard (Table Editor → `prayer_records`)
+   for the row and its `prayer_date`.
