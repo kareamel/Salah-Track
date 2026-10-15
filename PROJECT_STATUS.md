@@ -1,6 +1,6 @@
 # SalahTrack: Project Status
 
-_Last updated: 15 October 2026 · Latest commit before this update: `a8da83c`_
+_Last updated: 15 October 2026 · Latest commit before this update: `4f6330f`_
 
 SalahTrack is a mobile-first, NFC-enabled Islamic prayer tracking web app.
 It is connected to the Supabase project "Salah-Track". The dashboard's daily
@@ -24,7 +24,8 @@ the prayer *times* are still samples, and they are labelled in the app.
 | App pages while logged out | ↪️ Redirect to `/auth/login` (intended) |
 | Database tables | ✅ `public.prayer_records` (§9) and `public.nfc_tags` (§12), both created by ChatGPT, RLS on |
 | Settings / profile | ✅ Real account details and a working Log out (§11). **Logged-in test passed** (§11.5). |
-| NFC (Phase 5) | ✅ Tag registration in Settings and the `/scan/{id}` check-in page are built and checked locally (§12). **Owner's browser test pending** (§12.7). No physical tag written, nothing deployed. |
+| NFC (Phase 5) | ✅ Tag registration (§12) and the **quick check-in** `/scan/{id}` (§13). The first real test passed: the iPhone scanned a physical tag on the live site and the prayer was saved (§13.1). Quick check-in redesign: logged-in test on the phone pending (§13.6). |
+| Hosting | ✅ Live on **Vercel**, from the private GitHub repo `kareamel/Salah-Track` (branch `master`). Every push to `master` redeploys automatically. |
 
 ---
 
@@ -56,7 +57,7 @@ does not appear in URLs.
 | `/history` | `app/(main)/history/page.tsx` | Month calendar (complete / partial / none), previous-month browsing, month totals, and a day view listing which prayers were recorded and when (**real data**) |
 | `/scan` | `app/(main)/scan/page.tsx` | "Ready to scan" screen with animated scanning state and a "How it works" guide (no real NFC) |
 | `/settings` | `app/(main)/settings/page.tsx` | Real account details (email, verified status, member since, last sign-in, sign-in method), **Log out**, prayer tracking info, **NFC tag registration** (§12) and About. Unfinished features are labelled "Coming soon" with no fake controls. |
-| `/scan/{id}` | `app/(main)/scan/[id]/page.tsx` → `components/salahtrack/scan-check-in.tsx` | **NFC check-in:** checks the tag belongs to you, shows today's prayers, records a chosen prayer after confirmation (§12) |
+| `/scan/{id}` | `app/(main)/scan/[id]/page.tsx` → `components/salahtrack/scan-check-in.tsx` | **NFC quick check-in:** checks the tag belongs to you, suggests the next unrecorded prayer with one large **Yes, I prayed** button, "Choose another prayer", success and all-done screens, today's progress (§13) |
 
 Shared code:
 
@@ -72,7 +73,8 @@ Shared code:
 | `components/salahtrack/confirm-sheet.tsx` | Generic bottom-sheet confirmation dialog (prayers, NFC tag removal) |
 | `components/salahtrack/toast.tsx` | Floating success/error message |
 | `components/salahtrack/nfc-registration.tsx` | Settings → NFC: register, copy, open, remove |
-| `components/salahtrack/check-in.tsx` | Check-in display pieces (progress, success banner, tag-not-found) |
+| `components/salahtrack/check-in.tsx` | Quick check-in display pieces: confirm card, choose-another, success, all-recorded, progress strip, tag-not-found, skeleton |
+| `lib/prayer-suggestion.ts` | **Which prayer to suggest** (currently: next unrecorded, in daily order). Kept separate so it can be swapped for real prayer times later. |
 | `lib/nfc-tags.ts` | Reads, registers and removes the user's row in `nfc_tags`; checks that a tag is the user's own |
 | `lib/nfc-link.ts` | Pure helpers: tag-id (UUID) check and `/scan/{id}` link building |
 | `lib/safe-redirect.ts` | Shared "only redirect inside the app" check (login form and email confirm route) |
@@ -249,6 +251,7 @@ prayer from that page.
 
 | Commit | Description |
 | --- | --- |
+| `4f6330f` | Add NFC tag registration and /scan/[id] check-in page |
 | `a8da83c` | Record passing Settings and Log out test in PROJECT_STATUS.md |
 | `78b4c4a` | Add real account Settings page with Log out |
 | `6e8e7b3` | Record passing logged-in statistics check in PROJECT_STATUS.md |
@@ -282,9 +285,12 @@ prayer from that page.
 10. ~~Settings/profile with Log out~~ ✅ (§11). Logged-in test passed (§11.5).
 11. ~~NFC tags table~~ ✅ (ChatGPT, §12). Further tables (e.g. settings) as
     agreed, with RLS on every table. Consider Supabase CLI migrations.
-12. ~~NFC registration + `/scan/{id}` check-in (local)~~ ✅ (§12).
-    **Next:** owner browser test (§12.7) → deploy to an HTTPS address →
-    write the production link to a physical tag → test on iPhone and Android.
+12. ~~NFC registration + `/scan/{id}` check-in~~ ✅ (§12). ~~Deploy to Vercel
+    and write a physical tag~~ ✅ (§13.1).
+13. ~~Quick check-in redesign~~ ✅ (§13). **Next:** deploy it (`git push`)
+    and test with the bracelet (§13.6).
+14. **Location-based prayer times** (separate phase). Then the check-in
+    suggestion can switch to the current prayer (§13.3).
 
 ---
 
@@ -639,3 +645,78 @@ dashboard's behaviour and design are unchanged.
    you're back on the check-in page.
 5. Settings → **Remove tag** → confirm → open the old link → "isn't linked to
    your account". Register again → a **new** link is created.
+
+---
+
+## 13. NFC quick check-in (15 October 2026)
+
+### 13.1 First real test (before this change)
+
+Reported by the project owner and verified by ChatGPT in the live Supabase
+database:
+
+- The app is deployed on Vercel. Scanning the physical NFC tag with an
+  iPhone opens the live `/scan/{id}` page.
+- Confirming a prayer saved it permanently. The live database contains one
+  prayer record and one registered NFC tag.
+
+### 13.2 What changed
+
+`/scan/{id}` is redesigned for speed: **scan → one tap → done**.
+
+| Before | Now |
+| --- | --- |
+| A list of all five prayers, then tap one, then a confirmation popup | One prayer shown big: **"Have you completed Asr?"** with a large **"Yes, I prayed"** button. That press is the confirmation, so there's no second popup. |
+| | **Choose another prayer** shows every other unrecorded prayer. Picking one swaps it into the big card (labelled "Selected prayer"). |
+| Banner above the list | **Success screen** after Supabase confirms: "Asr recorded. May Allah accept it.", x of 5 recorded today, **Go to dashboard**, **Record another prayer** |
+| | **All prayers recorded today** screen when all five are done |
+| Progress bar | Five-prayer progress strip (Fajr … Isha, recorded ones filled) |
+| Tag check, *then* load records | Tag check and today's records load **at the same time** (records are only shown once the tag is verified), so the screen appears faster |
+
+Unchanged: the NFC URL format and the registered tag (no need to reprogram
+it), registration in Settings, login and return-to-scan redirects, the
+dashboard, History, statistics and Settings.
+
+### 13.3 Suggestion logic (`lib/prayer-suggestion.ts`)
+
+- **Next unrecorded prayer** in Fajr → Dhuhr → Asr → Maghrib → Isha order
+  (the earliest prayer without a record today).
+- Labelled **"Next unrecorded prayer"**, never "current prayer". The sample
+  prayer times are **not** used.
+- Any other unrecorded prayer can always be chosen instead.
+- Returns `null` when all five are recorded, which shows the "All prayers
+  recorded today" screen.
+- Kept in its own pure, tested module. To add time-based suggestions later,
+  add a new strategy that returns the same `{ prayer, reason, label }`
+  shape. The page doesn't need to change.
+
+### 13.4 Reliability
+
+| Case | Handling |
+| --- | --- |
+| Opening the page | Nothing is saved. Saving happens only when **Yes, I prayed** is pressed. |
+| Prayer already recorded | Never re-sent. `recordPrayer` refuses if today's records already contain it. If the database still reports a duplicate (e.g. saved in another tab), the friendly message appears and today's records reload. |
+| Fast double-tap | A synchronous guard (`useRef`) blocks a second save while the first is in progress. The button also shows "Saving…" and is disabled. |
+| Expired session | "Your session has expired…" with a **Log in again** link to `/auth/login?next=/scan/{id}`. The same applies if the session expired during the tag check. |
+| Network problem | Friendly message inside the card. The button becomes **Try again**. |
+| Saving logic | `recordPrayer` is a new one-tap entry in the shared `useTodayPrayers()` hook. It uses the same `addPrayerRecord` save step as the dashboard's dialog (now shared as `saveRecord`). No database changes. |
+
+### 13.5 Checks run
+
+| Check | Result |
+| --- | --- |
+| `npm test` | ✅ 56/56 (7 new suggestion tests) |
+| TypeScript | ✅ Pass |
+| ESLint on source | ✅ Pass (`npm run lint`: only the starter's `tailwind.config.ts` issue, unchanged) |
+| Production build | ✅ Pass |
+| Logged-out `/scan/{id}` (dev server) | ✅ 307 to `/auth/login?next=%2Fscan%2F…` |
+| Visual check with test data on a production build (temporary page, deleted) | ✅ Quick confirm, choose another (open), progress strip, "Selected prayer", Saving…, expired-session error with Log in again, success, all recorded, loading skeleton |
+
+### 13.6 To do: deploy and test on the phone
+
+1. Deploy: push to GitHub (`git push`). Vercel builds and publishes
+   automatically in about 1–2 minutes.
+2. Scan the bracelet. The suggested prayer appears straight away. Tap **Yes,
+   I prayed** and the success screen appears.
+3. Try **Choose another prayer**, **Record another prayer**, and scanning
+   again once all five are done ("All prayers recorded today").

@@ -1,17 +1,19 @@
 import { Suspense } from "react";
 import { TagCheckingSkeleton } from "@/components/salahtrack/check-in";
-import { ScanCheckIn } from "@/components/salahtrack/scan-check-in";
-import { PageHeader } from "@/components/salahtrack/ui";
+import {
+  CheckInHeader,
+  ScanCheckIn,
+} from "@/components/salahtrack/scan-check-in";
 
-// NFC check-in page: /scan/<tag id>. The tag id is read in the browser, so
+// NFC quick check-in: /scan/<tag id>. The tag id is read in the browser, so
 // the screen is wrapped in <Suspense> (required by Next.js for pages that
-// read a dynamic part of the URL).
+// read a dynamic part of the URL). The placeholder matches the real layout.
 export default function ScanCheckInPage() {
   return (
     <Suspense
       fallback={
         <>
-          <PageHeader title="NFC check-in" subtitle={" "} />
+          <CheckInHeader dateLabel={undefined} verified={false} />
           <TagCheckingSkeleton />
         </>
       }
