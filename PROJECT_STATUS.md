@@ -1,12 +1,12 @@
 # SalahTrack: Project Status
 
-_Last updated: 15 October 2026 · Latest commit before this update: `517762e`_
+_Last updated: 15 October 2026 · Latest commit before this update: `b039b38`_
 
 SalahTrack is a mobile-first, NFC-enabled Islamic prayer tracking web app.
-It is connected to the Supabase project "Salah-Track". **The dashboard's
-daily prayer checklist now saves to and loads from the real
-`prayer_records` table.** Streaks, weekly stats and History still show
-clearly labelled sample data.
+It is connected to the Supabase project "Salah-Track". The dashboard's daily
+checklist, **streaks, weekly statistics and the History calendar all use real
+data from `prayer_records`**. All sample statistics have been removed. Only
+the prayer *times* are still samples, and they are labelled in the app.
 
 ---
 
@@ -16,7 +16,8 @@ clearly labelled sample data.
 | --- | --- |
 | Frontend (4 screens) | ✅ Built, committed and tested at iPhone size |
 | Dashboard: today's prayers | ✅ **Real data** from `public.prayer_records` (confirm → insert, undo → delete). Code checks pass and the **logged-in test passed** (§9.4). |
-| Streak, weekly chart, History page | ⚠️ Sample data, labelled "Sample data" in the app |
+| Streak, weekly chart, History page | ✅ **Real data** (§10). 40 automated tests pass. Logged-in check by the project owner pending (§10.6). |
+| Prayer times | ⚠️ Sample times, labelled "Sample times" on the dashboard |
 | Supabase project connected | ✅ Yes: `Salah-Track`, verified 15 October 2026 |
 | Environment variables | ✅ Set in `.env.local` (Git-ignored, not committed) |
 | Authentication | ✅ Active (email + password). Redirect fixes are done (§5). Login, logout and log back in verified with a real account (§9.4). |
@@ -50,8 +51,8 @@ does not appear in URLs.
 
 | URL | File | What it does |
 | --- | --- | --- |
-| `/dashboard` | `app/(main)/dashboard/page.tsx` | Greeting, Gregorian + Hijri date, progress ring (x/5), five prayers with Confirm/Done buttons (**real data**, with confirmation dialog), streak card and 7-day chart (sample, labelled) |
-| `/history` | `app/(main)/history/page.tsx` | 7/14-day switch, completion %, perfect days, missed count, per-day prayer breakdown (sample, labelled in subtitle) |
+| `/dashboard` | `app/(main)/dashboard/page.tsx` | Greeting, Gregorian + Hijri date, progress ring (x/5), five prayers with Confirm/Done buttons and confirmation dialog, real current/best streak, real last-7-days chart (all **real data**). Prayer times are labelled as samples. |
+| `/history` | `app/(main)/history/page.tsx` | Month calendar (complete / partial / none), previous-month browsing, month totals, and a day view listing which prayers were recorded and when (**real data**) |
 | `/scan` | `app/(main)/scan/page.tsx` | "Ready to scan" screen with animated scanning state and a "How it works" guide (no real NFC) |
 | `/settings` | `app/(main)/settings/page.tsx` | Guest profile card, reminder/Hijri/vibration switches, calculation method, version (not saved) |
 
@@ -61,18 +62,24 @@ Shared code:
 | --- | --- |
 | `app/(main)/layout.tsx` | Shared background, page width and bottom nav; sets page title "SalahTrack" |
 | `components/salahtrack/bottom-nav.tsx` | Bottom navigation (Home, History, Scan, Settings) with active-tab highlight |
-| `components/salahtrack/ui.tsx` | Shared animation/card styles, `PageHeader`, `SampleBadge` |
-| `lib/prayers.ts` | The five prayers (names, Arabic, icons, sample times) |
-| `lib/prayer-records.ts` | Reads, adds and deletes the user's rows in `prayer_records`, with friendly error messages |
-| `lib/demo-data.ts` | Remaining **sample** statistics: 14 days of history and streak numbers |
-| `lib/use-today.ts` | Today's date in the user's time zone, updated after midnight. `toLocalDateString()` returns the local `YYYY-MM-DD` used for `prayer_date`. |
+| `components/salahtrack/ui.tsx` | Shared animation/card styles, `PageHeader`, `SampleBadge`, `InlineError`, `LoadStatus` |
+| `components/salahtrack/stats-cards.tsx` | Streak card and weekly chart card (loading / error / empty / ready states) |
+| `components/salahtrack/history-calendar.tsx` | Month calendar grid, legend and selected-day details |
+| `lib/prayer-names.ts` | The five prayer names (shared by the app and the tests) |
+| `lib/prayers.ts` | The five prayers with display details (Arabic, icons, sample times) |
+| `lib/prayer-records.ts` | Reads, adds and deletes the user's rows in `prayer_records`. Paginated history queries and the account start date. Friendly error messages. |
+| `lib/prayer-stats.ts` | **Pure statistics functions:** day grouping, current/longest streak, last 7 days, month calendar |
+| `lib/prayer-stats.test.ts` | 40 automated tests (`npm test`) |
+| `lib/local-date.ts` | Local calendar-date helpers (`toLocalDateString`, `addDays`, month helpers). Time-zone and summer-time safe. |
+| `lib/use-today.ts` | React hook: today's date in the user's time zone, updated after midnight |
 | `supabase/schema/prayer_records.sql` | Reference copy of the table's schema. **Already applied, do not run.** |
 
 Behaviour notes:
 
-- Today's prayer confirmations are saved in Supabase. Settings switches and
-  the scan button are still visual only.
-- Prayer times are fixed sample values, not calculated for a location.
+- Today's prayer confirmations, streaks, weekly stats and History come from
+  Supabase. Settings switches and the scan button are still visual only.
+- Prayer times are fixed sample values, not calculated for a location. They
+  are labelled "Sample times" on the dashboard.
 - Settings still shows a "Guest" profile card even when logged in, and the
   SalahTrack screens have no Log out button yet. Log out from the starter
   home page (`/`).
@@ -229,6 +236,7 @@ prayer from that page.
 
 | Commit | Description |
 | --- | --- |
+| `b039b38` | Record passing logged-in test in PROJECT_STATUS.md |
 | `517762e` | Connect dashboard prayer checklist to Supabase prayer_records |
 | `8cb2a3e` | Fix auth redirects and open redirect in email confirm route |
 | `dd7d7e9` | Update PROJECT_STATUS.md with verified Supabase connection |
@@ -252,8 +260,8 @@ prayer from that page.
 6. ~~Create the first table (`prayer_records`)~~ ✅ (ChatGPT, §9)
 7. ~~Connect the dashboard's daily checklist to `prayer_records`~~ ✅ (§9)
 8. ~~Live test of the dashboard while logged in~~ ✅ (§9.4)
-9. **Real statistics:** streak, weekly chart and History from
-   `prayer_records`, replacing `lib/demo-data.ts`.
+9. ~~Real statistics: streak, weekly chart and History~~ ✅ (§10).
+   Logged-in visual check pending (§10.6).
 10. **Settings/profile:** show the signed-in user instead of "Guest" and add
     a Log out button inside SalahTrack.
 11. **Further tables** as agreed with ChatGPT (e.g. NFC tags, settings), with
@@ -327,3 +335,109 @@ this test with their real account:
 Not explicitly tested yet (optional): the duplicate message from two tabs,
 the network-error message, and checking the row's `prayer_date` in the
 Supabase Table Editor.
+
+---
+
+## 10. Real statistics and History (15 October 2026)
+
+No database schema changes were made. All reads go through the existing
+browser Supabase client with the user's session, so Row Level Security still
+limits every query to the user's own rows.
+
+### 10.1 Rules implemented (`lib/prayer-stats.ts`)
+
+| Rule | Implementation |
+| --- | --- |
+| Complete day | All **five different** prayer names recorded for that local date. Duplicates and unknown names are ignored. |
+| Current streak | Consecutive complete days. If today is complete, it counts today. If today is not complete yet, it counts back from **yesterday** (today doesn't break it until it ends). Any earlier incomplete or unrecorded day ends the streak. |
+| Longest streak | Longest run of consecutive complete days in the **full** history, up to today |
+| No records | Streak 0, best 0, with a "start your streak" message (no sample values) |
+| Wording | A missing record is shown as "Not recorded" or "No prayers recorded", never as "missed" |
+| Future-dated rows | Ignored by streaks |
+
+### 10.2 Weekly statistics (dashboard)
+
+- The last **7 local calendar days, including today** (oldest first).
+- Per day: different prayers recorded, out of 5.
+- **Completion % = recorded ÷ possible.** Possible = 5 × the days in the
+  window **on or after the user's sign-up date** (`auth.users.created_at`,
+  converted to the local date). New users aren't counted against days
+  before they joined. If the sign-up date can't be read, all 7 days count.
+  A note under the chart explains this when it applies.
+- Updates straight away after Confirm/Undo: today's figures come from the live
+  checklist, so no reload is needed.
+
+### 10.3 History page
+
+- Month calendar (Monday first). Each day shows as **All 5 recorded**
+  (solid green), **Some recorded** (light green with "3/5") or **None
+  recorded**. Today is bold, future days are disabled, and days before
+  sign-up are greyed out.
+- Previous/next month buttons. You can't go past the current month or before
+  the sign-up month.
+- Month totals: prayers recorded, complete days, partial days.
+- Tap a day to see each prayer as recorded (with the local time it was
+  recorded) or "Not recorded". Days without records show an empty state.
+
+### 10.4 Data loading
+
+| Need | Query |
+| --- | --- |
+| Dashboard streak + week | `fetchPrayerHistory()`: **all** of the user's rows, columns `prayer_date, prayer_name, completed_at` only, ordered by `prayer_date, id` |
+| History month | `fetchPrayerHistory({ from, to })`: only that month's rows (`gte`/`lte` on `prayer_date`) |
+| Sign-up date | `supabase.auth.getUser()` → `created_at` |
+
+**No silent truncation:** PostgREST returns at most 1,000 rows per request
+by default, and a project can set it lower. `fetchPrayerHistory` keeps
+requesting the next page (`range`) until an **empty page** comes back. That
+way the longest streak is always calculated from the complete history, even
+if the server limit is smaller than our page size. At up to 5 rows per day,
+one year is about 1,825 rows (2–3 small requests).
+*Possible future optimisation (needs a schema change, not done):* a database
+view or RPC that returns one row per date with its prayer count. That would
+be worth discussing if histories grow large.
+
+Logged-out check: the exact History query returns `401 42501 permission
+denied` (RLS working, query well-formed). A deliberately malformed query
+returns `400`.
+
+### 10.5 Checks run
+
+| Check | Result |
+| --- | --- |
+| `npm test` (Node's built-in test runner, no new libraries) | ✅ **40/40 pass** |
+| TypeScript (`tsc --noEmit`) | ✅ Pass |
+| ESLint on `app/`, `components/`, `lib/`, `proxy.ts` | ✅ Pass |
+| `npm run lint` (whole project) | ⚠️ 1 error that was already there in the starter's `tailwind.config.ts` (`require()` import). Not changed. |
+| Production build (`next build`) | ✅ Pass (18 routes) |
+| Visual check of all new components with test data (temporary preview page, deleted before commit) | ✅ Streak (active / zero / loading / error), weekly chart (partial week with sign-up note), calendar (complete / partial / none / selected / before sign-up / future), day details (recorded / not recorded / empty) |
+
+Test coverage (`lib/prayer-stats.test.ts`) includes:
+- local dates around **midnight** in 6 time zones (UTC−11 to UTC+14), with
+  proof that `toISOString()` would get them wrong
+- **incomplete current day** (keeps yesterday's streak), and the moment after
+  midnight when yesterday's incomplete day breaks it
+- gaps and partial days breaking a streak
+- **month, year and leap-day boundaries**, and summer-time changes
+- duplicates and unknown prayer names
+- longest streak from older history
+- the weekly window, possible-prayer counting from the sign-up date, and
+  month calendar sizes (including leap February)
+
+Tooling changes: `npm test` script added. `allowImportingTsExtensions` was
+added to `tsconfig.json` so Node can run the TypeScript tests directly.
+`eslint.config.mjs` now ignores Next.js's generated `.next/` folder.
+
+### 10.6 Not yet verified (needs a logged-in account)
+
+**Restart the dev server first** (Ctrl+C, then `npm run dev`). During
+development its cache kept an outdated copy of `components/salahtrack/ui.tsx`.
+A fresh production build renders correctly.
+
+1. Dashboard: streak and "This week" show your real numbers (with only
+   today's records: streak 0 or 1, week counted from your sign-up day).
+2. Confirm all five prayers today → streak becomes at least 1 and the
+   message says today is complete. Undo one → it goes back straight away.
+3. History: today is highlighted. Days you recorded show green or light
+   green. Tap a day to see its prayers. The previous-month button is
+   disabled in your sign-up month.

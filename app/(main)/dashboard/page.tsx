@@ -1,39 +1,45 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
   Check,
-  Flame,
   Loader2,
   Moon,
   RotateCcw,
-  Trophy,
   UserRound,
 } from "lucide-react";
-import { card, enter, SampleBadge } from "@/components/salahtrack/ui";
+import { StreakCard, WeeklyCard } from "@/components/salahtrack/stats-cards";
 import {
-  DEMO_BEST_STREAK,
-  DEMO_MISSED_BY_DAY,
-  DEMO_STREAK,
-} from "@/lib/demo-data";
+  enter,
+  SampleBadge,
+  type LoadStatus,
+} from "@/components/salahtrack/ui";
+import { toLocalDateString } from "@/lib/local-date";
 import {
   addPrayerRecord,
   deletePrayerRecord,
+  fetchAccountStartDate,
+  fetchPrayerHistory,
   fetchPrayerRecords,
   PrayerRecordError,
   type PrayerRecord,
 } from "@/lib/prayer-records";
+import {
+  buildDayMap,
+  lastSevenDays,
+  streakSummary,
+  type DayMap,
+} from "@/lib/prayer-stats";
 import {
   PRAYERS,
   TOTAL_PRAYERS,
   type Prayer,
   type PrayerName,
 } from "@/lib/prayers";
-import { daysBefore, toLocalDateString, useToday } from "@/lib/use-today";
+import { useToday } from "@/lib/use-today";
 
-type LoadStatus = "loading" | "ready" | "error";
 type RecordsByPrayer = Partial<Record<PrayerName, PrayerRecord>>;
 type PendingAction = { prayer: Prayer; action: "complete" | "undo" };
 type Toast = { tone: "success" | "error"; message: string };
@@ -84,6 +90,34 @@ export default function DashboardPage() {
     };
   }, [prayerDate, reloadKey]);
 
+  // Full history for the streak and weekly statistics. Loaded alongside
+  // today's records; today's part is then kept up to date from `records`.
+  const [history, setHistory] = useState<DayMap | null>(null);
+  const [accountStart, setAccountStart] = useState<string | null>(null);
+  const [statsStatus, setStatsStatus] = useState<LoadStatus>("loading");
+  const [statsReloadKey, setStatsReloadKey] = useState(0);
+
+  useEffect(() => {
+    if (!prayerDate) return;
+    let cancelled = false;
+    setStatsStatus("loading");
+
+    Promise.all([fetchPrayerHistory(), fetchAccountStartDate()])
+      .then(([entries, start]) => {
+        if (cancelled) return;
+        setHistory(buildDayMap(entries));
+        setAccountStart(start);
+        setStatsStatus("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setStatsStatus("error");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [prayerDate, statsReloadKey]);
+
   // Hide messages automatically after a few seconds.
   useEffect(() => {
     if (!toast) return;
@@ -98,6 +132,20 @@ export default function DashboardPage() {
   const allDone = completedCount === TOTAL_PRAYERS;
   const nextPrayer =
     status === "ready" ? PRAYERS.find((p) => !records[p.name]) : undefined;
+
+  // Statistics: the loaded history, with today replaced by the live checklist
+  // so confirming or undoing a prayer updates the streak and chart instantly.
+  const stats = useMemo(() => {
+    if (!history || !prayerDate) return null;
+    const days = new Map(history);
+    if (status === "ready") {
+      days.set(prayerDate, new Set(Object.keys(records) as PrayerName[]));
+    }
+    return {
+      streak: streakSummary(days, prayerDate),
+      week: lastSevenDays(days, prayerDate, accountStart),
+    };
+  }, [history, records, status, prayerDate, accountStart]);
 
   function openDialog(prayer: Prayer) {
     if (status !== "ready") return;
@@ -168,12 +216,16 @@ export default function DashboardPage() {
       />
 
       <section className={`${enter} delay-200`}>
-        <div className="mb-3 flex items-baseline justify-between px-1">
+        <div className="mb-1 flex items-baseline justify-between px-1">
           <h2 className="text-lg font-semibold tracking-tight">
             Today&apos;s prayers
           </h2>
           <span className="text-sm text-stone-500">Tap to confirm</span>
         </div>
+        <p className="mb-3 flex items-center gap-2 px-1 text-xs text-stone-500">
+          <SampleBadge>Sample times</SampleBadge>
+          Real times for your location are coming soon.
+        </p>
 
         {status === "error" ? (
           <LoadErrorCard
@@ -197,8 +249,16 @@ export default function DashboardPage() {
         )}
       </section>
 
-      <StreakCard />
-      <WeeklyCard now={now} />
+      <StreakCard
+        status={statsStatus}
+        summary={stats?.streak ?? null}
+        onRetry={() => setStatsReloadKey((k) => k + 1)}
+      />
+      <WeeklyCard
+        status={statsStatus}
+        week={stats?.week ?? null}
+        onRetry={() => setStatsReloadKey((k) => k + 1)}
+      />
 
       {pending && (
         <ConfirmDialog
@@ -726,125 +786,6 @@ function ToastMessage({ toast }: { toast: Toast }) {
         )}
         {toast.message}
       </div>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Streak card (sample data for now)                                         */
-/* -------------------------------------------------------------------------- */
-
-function StreakCard() {
-  return (
-    <section className={`${enter} delay-300 ${card}`}>
-      <div className="flex items-center gap-4">
-        <div className="grid size-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 text-orange-500">
-          <Flame className="size-7" fill="currentColor" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium text-stone-500">Daily streak</p>
-            <SampleBadge />
-          </div>
-          <p className="text-2xl font-semibold tracking-tight">
-            <span className="tabular-nums">{DEMO_STREAK}</span>{" "}
-            {DEMO_STREAK === 1 ? "day" : "days"}
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-600">
-          <Trophy className="size-3.5 text-amber-500" />
-          Best {DEMO_BEST_STREAK}
-        </div>
-      </div>
-      <p className="mt-4 rounded-2xl bg-stone-50 px-4 py-3 text-sm text-stone-600">
-        Example numbers only. Your real streak is coming soon, in sha Allah.
-      </p>
-    </section>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Weekly statistics (sample data for now)                                   */
-/* -------------------------------------------------------------------------- */
-
-function WeeklyCard({ now }: { now: Date | null }) {
-  // 7 sample days, oldest first, ending yesterday.
-  const days = DEMO_MISSED_BY_DAY.slice(0, 7)
-    .map((missed, i) => ({ count: TOTAL_PRAYERS - missed.length, daysAgo: i + 1 }))
-    .reverse()
-    .map((day) => ({
-      ...day,
-      label: now
-        ? daysBefore(now, day.daysAgo).toLocaleDateString("en-GB", {
-            weekday: "short",
-          })
-        : "",
-    }));
-  const counts = days.map((d) => d.count);
-
-  const totalPrayed = counts.reduce((sum, c) => sum + c, 0);
-  const totalPossible = counts.length * TOTAL_PRAYERS;
-  const percent = Math.round((totalPrayed / totalPossible) * 100);
-  const perfectDays = counts.filter((c) => c === TOTAL_PRAYERS).length;
-
-  return (
-    <section className={`${enter} delay-500 ${card}`}>
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold tracking-tight">This week</h2>
-            <SampleBadge />
-          </div>
-          <p className="text-sm text-stone-500">Example of your weekly view</p>
-        </div>
-        <div className="text-right">
-          <p className="text-2xl font-semibold tabular-nums text-emerald-700">
-            {percent}%
-          </p>
-          <p className="text-xs text-stone-500">completion</p>
-        </div>
-      </div>
-
-      {/* Bar chart */}
-      <div className="mt-5 flex items-end gap-2">
-        {days.map((day) => (
-          <div
-            key={day.daysAgo}
-            className="flex flex-1 flex-col items-center gap-2"
-          >
-            <div className="flex h-24 w-full items-end overflow-hidden rounded-xl bg-stone-100">
-              <div
-                className={`w-full rounded-xl ${
-                  day.count === TOTAL_PRAYERS
-                    ? "bg-gradient-to-t from-emerald-600 to-emerald-400"
-                    : "bg-emerald-200"
-                }`}
-                style={{ height: `${(day.count / TOTAL_PRAYERS) * 100}%` }}
-              />
-            </div>
-            <span className="h-4 text-xs text-stone-400">{day.label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Summary numbers */}
-      <div className="mt-5 grid grid-cols-3 divide-x divide-stone-200 rounded-2xl bg-stone-50 py-3 text-center">
-        <Stat value={`${totalPrayed}/${totalPossible}`} label="Prayers" />
-        <Stat value={String(perfectDays)} label="Perfect days" />
-        <Stat
-          value={(totalPrayed / counts.length).toFixed(1)}
-          label="Daily avg"
-        />
-      </div>
-    </section>
-  );
-}
-
-function Stat({ value, label }: { value: string; label: string }) {
-  return (
-    <div>
-      <p className="text-base font-semibold tabular-nums">{value}</p>
-      <p className="text-xs text-stone-500">{label}</p>
     </div>
   );
 }

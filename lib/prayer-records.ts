@@ -1,6 +1,7 @@
 import type { PostgrestError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
-import type { PrayerName } from "@/lib/prayers";
+import { toLocalDateString } from "@/lib/local-date";
+import type { PrayerName } from "@/lib/prayer-names";
 
 /* -------------------------------------------------------------------------- */
 /*  Reading and writing the signed-in user's rows in public.prayer_records.  */
@@ -95,6 +96,66 @@ export async function addPrayerRecord(
 
   if (error) throw toFriendlyError(error, "save");
   return data as PrayerRecord;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  History (for statistics and the History page)                            */
+/* -------------------------------------------------------------------------- */
+
+export type PrayerHistoryEntry = {
+  prayer_date: string;
+  prayer_name: PrayerName;
+  completed_at: string;
+};
+
+// Supabase returns at most 1,000 rows per request by default (the project can
+// set a lower limit). We keep asking for the next page until an empty page
+// comes back, so statistics are never silently based on part of the history.
+const PAGE_SIZE = 1000;
+
+/**
+ * The user's records, oldest first. Pass `range` to limit it to some dates
+ * (e.g. one month); leave it out to get the full history (for all-time
+ * statistics like the longest streak).
+ */
+export async function fetchPrayerHistory(range?: {
+  from: string;
+  to: string;
+}): Promise<PrayerHistoryEntry[]> {
+  const supabase = createClient();
+  const entries: PrayerHistoryEntry[] = [];
+
+  for (;;) {
+    let query = supabase
+      .from(TABLE)
+      .select("prayer_date, prayer_name, completed_at")
+      .order("prayer_date", { ascending: true })
+      .order("id", { ascending: true }); // stable order between pages
+    if (range) {
+      query = query.gte("prayer_date", range.from).lte("prayer_date", range.to);
+    }
+
+    const { data, error } = await query.range(
+      entries.length,
+      entries.length + PAGE_SIZE - 1,
+    );
+    if (error) throw toFriendlyError(error, "load");
+    if (!data || data.length === 0) break;
+    entries.push(...(data as PrayerHistoryEntry[]));
+  }
+
+  return entries;
+}
+
+/**
+ * The local date the user's account was created, or null if unknown. Days
+ * before this can't have records, so they don't count as "possible" prayers.
+ */
+export async function fetchAccountStartDate(): Promise<string | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user?.created_at) return null;
+  return toLocalDateString(new Date(data.user.created_at));
 }
 
 /** Deletes one of the user's records (used to undo a mistake). */

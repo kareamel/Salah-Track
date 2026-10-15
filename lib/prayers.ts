@@ -7,10 +7,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-// The five daily prayers. `name` must match the values allowed in the
-// prayer_records.prayer_name column.
-export type PrayerName = "Fajr" | "Dhuhr" | "Asr" | "Maghrib" | "Isha";
+import type { PrayerName } from "@/lib/prayer-names";
 
+export type { PrayerName };
+
+// The five daily prayers with display details.
 export type Prayer = {
   name: PrayerName;
   arabic: string;
