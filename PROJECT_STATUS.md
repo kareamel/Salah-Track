@@ -1,6 +1,6 @@
 # SalahTrack: Project Status
 
-_Last updated: 15 October 2026 · Latest commit before this update: `6e8e7b3`_
+_Last updated: 15 October 2026 · Latest commit before this update: `78b4c4a`_
 
 SalahTrack is a mobile-first, NFC-enabled Islamic prayer tracking web app.
 It is connected to the Supabase project "Salah-Track". The dashboard's daily
@@ -23,7 +23,7 @@ the prayer *times* are still samples, and they are labelled in the app.
 | Authentication | ✅ Active (email + password). Redirect fixes are done (§5). Login, logout and log back in verified with a real account (§9.4). **Log out button in Settings** (§11). |
 | App pages while logged out | ↪️ Redirect to `/auth/login` (intended) |
 | Database tables | ✅ `public.prayer_records`, created by ChatGPT, RLS on (§9) |
-| Settings / profile | ✅ Real account details and a working Log out (§11). Logged-in check by the project owner pending (§11.5). |
+| Settings / profile | ✅ Real account details and a working Log out (§11). **Logged-in test passed** (§11.5). |
 | NFC | ❌ Not started (Scan screen is visual only; Settings shows the NFC bracelet as "Coming soon") |
 
 ---
@@ -238,6 +238,7 @@ prayer from that page.
 
 | Commit | Description |
 | --- | --- |
+| `78b4c4a` | Add real account Settings page with Log out |
 | `6e8e7b3` | Record passing logged-in statistics check in PROJECT_STATUS.md |
 | `0252cac` | Add real streaks, weekly statistics and History calendar |
 | `b039b38` | Record passing logged-in test in PROJECT_STATUS.md |
@@ -266,7 +267,7 @@ prayer from that page.
 8. ~~Live test of the dashboard while logged in~~ ✅ (§9.4)
 9. ~~Real statistics: streak, weekly chart and History~~ ✅ (§10).
    Logged-in check passed (§10.6).
-10. ~~Settings/profile with Log out~~ ✅ (§11). Logged-in check pending (§11.5).
+10. ~~Settings/profile with Log out~~ ✅ (§11). Logged-in test passed (§11.5).
 11. **Further tables** as agreed with ChatGPT (e.g. NFC tags, settings), with
     RLS on every table. Consider moving to Supabase CLI migrations.
 12. **NFC**, using the URL-on-tag approach above.
@@ -512,14 +513,15 @@ label. They are not switches or buttons.
 | Logged-out access to the 4 app pages | ✅ All redirect to `/auth/login` |
 | Visual check with test data on a fresh production build (temporary preview page, deleted before commit) | ✅ Verified and unverified email, long email (truncates), loading, load error, logout error, "Logging out…", Coming soon rows, NFC and About sections. Long values use a stacked label/value layout so nothing is squeezed. |
 
-### 11.5 Not yet verified (needs a logged-in account)
+### 11.5 Logged-in test ✅ (project owner, 15 October 2026)
 
-**Restart the dev server first** (Ctrl+C, then `npm run dev`), because
-`components/salahtrack/ui.tsx` changed again.
+After restarting the dev server, the project owner tested with their real
+account. Everything worked:
 
-1. Settings shows your real email, verified status and dates.
-2. Tap **Log out** → you land on the login page.
-3. Press the browser's **Back** button → you stay on (or return to) the
-   login page. No SalahTrack screen is shown.
-4. Type `/dashboard` in the address bar → redirected to login.
-5. Log back in → dashboard, statistics and History work as before.
+| Step | Result |
+| --- | --- |
+| Settings shows the real email, verified status and dates | ✅ Passed |
+| **Log out** → login page | ✅ Passed |
+| Browser **Back** after logging out → no SalahTrack screen shown | ✅ Passed |
+| Typing `/dashboard` while logged out → redirected to login | ✅ Passed |
+| Log back in → dashboard, statistics and History work as before | ✅ Passed |
