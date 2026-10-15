@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { History, Home, Nfc, Settings, type LucideIcon } from "lucide-react";
@@ -12,9 +13,23 @@ const NAV_ITEMS: { label: string; href: string; icon: LucideIcon }[] = [
 ];
 
 export function BottomNav() {
+  // Reading the URL needs a <Suspense> boundary on pages with a dynamic part
+  // (e.g. /scan/<tag id>). Until it's known, the same bar shows without a
+  // highlighted tab.
+  return (
+    <Suspense fallback={<BottomNavBar pathname={null} />}>
+      <BottomNavWithPath />
+    </Suspense>
+  );
+}
+
+function BottomNavWithPath() {
   // The current URL, e.g. "/history". Used to highlight the active tab.
   const pathname = usePathname();
+  return <BottomNavBar pathname={pathname} />;
+}
 
+function BottomNavBar({ pathname }: { pathname: string | null }) {
   return (
     <nav
       aria-label="Main"
@@ -22,7 +37,10 @@ export function BottomNav() {
     >
       <div className="mx-auto flex max-w-md items-center justify-around rounded-[28px] bg-white/85 p-2 shadow-xl shadow-stone-900/10 ring-1 ring-stone-200/80 backdrop-blur-xl">
         {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-          const active = pathname === href;
+          // Also active on sub-pages, e.g. Scan on /scan/<tag id>.
+          const active =
+            pathname !== null &&
+            (pathname === href || pathname.startsWith(`${href}/`));
           const isScan = label === "Scan";
 
           return (

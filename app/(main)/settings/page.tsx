@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { NfcRegistration } from "@/components/salahtrack/nfc-registration";
 import {
   AboutSection,
   AccountSection,
-  NfcSection,
   PrayerTrackingSection,
 } from "@/components/salahtrack/settings-sections";
 import { PageHeader, type LoadStatus } from "@/components/salahtrack/ui";
@@ -72,7 +72,7 @@ export default function SettingsPage() {
         logoutError={logoutError}
       />
       <PrayerTrackingSection timeZone={timeZone} />
-      <NfcSection />
+      <NfcRegistration />
       <AboutSection />
     </>
   );

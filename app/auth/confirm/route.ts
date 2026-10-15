@@ -1,23 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
+import { safeNextPath } from "@/lib/safe-redirect";
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { type NextRequest } from "next/server";
-
-const DEFAULT_NEXT = "/dashboard";
-
-// Only allow redirects to pages inside this app (e.g. "/dashboard"). Anything
-// that would leave the site, such as "https://evil.example" or
-// "//evil.example", falls back to the dashboard.
-function safeNextPath(next: string | null, origin: string) {
-  if (!next) return DEFAULT_NEXT;
-  try {
-    const url = new URL(next, origin);
-    if (url.origin !== origin) return DEFAULT_NEXT;
-    return url.pathname + url.search + url.hash;
-  } catch {
-    return DEFAULT_NEXT;
-  }
-}
 
 function errorPage(message: string) {
   return `/auth/error?error=${encodeURIComponent(message)}`;

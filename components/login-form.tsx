@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { safeNextPath } from "@/lib/safe-redirect";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -38,8 +39,11 @@ export function LoginForm({
         password,
       });
       if (error) throw error;
-      // The user now has an active session, so send them to the app.
-      router.push("/dashboard");
+      // The user now has an active session. Send them back to the page they
+      // were trying to open (e.g. an NFC link), if it is inside this app;
+      // otherwise to the dashboard.
+      const next = new URLSearchParams(window.location.search).get("next");
+      router.push(safeNextPath(next, window.location.origin));
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {

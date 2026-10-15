@@ -1,6 +1,6 @@
 # SalahTrack: Project Status
 
-_Last updated: 15 October 2026 · Latest commit before this update: `78b4c4a`_
+_Last updated: 15 October 2026 · Latest commit before this update: `a8da83c`_
 
 SalahTrack is a mobile-first, NFC-enabled Islamic prayer tracking web app.
 It is connected to the Supabase project "Salah-Track". The dashboard's daily
@@ -22,9 +22,9 @@ the prayer *times* are still samples, and they are labelled in the app.
 | Environment variables | ✅ Set in `.env.local` (Git-ignored, not committed) |
 | Authentication | ✅ Active (email + password). Redirect fixes are done (§5). Login, logout and log back in verified with a real account (§9.4). **Log out button in Settings** (§11). |
 | App pages while logged out | ↪️ Redirect to `/auth/login` (intended) |
-| Database tables | ✅ `public.prayer_records`, created by ChatGPT, RLS on (§9) |
+| Database tables | ✅ `public.prayer_records` (§9) and `public.nfc_tags` (§12), both created by ChatGPT, RLS on |
 | Settings / profile | ✅ Real account details and a working Log out (§11). **Logged-in test passed** (§11.5). |
-| NFC | ❌ Not started (Scan screen is visual only; Settings shows the NFC bracelet as "Coming soon") |
+| NFC (Phase 5) | ✅ Tag registration in Settings and the `/scan/{id}` check-in page are built and checked locally (§12). **Owner's browser test pending** (§12.7). No physical tag written, nothing deployed. |
 
 ---
 
@@ -55,7 +55,8 @@ does not appear in URLs.
 | `/dashboard` | `app/(main)/dashboard/page.tsx` | Greeting, Gregorian + Hijri date, progress ring (x/5), five prayers with Confirm/Done buttons and confirmation dialog, real current/best streak, real last-7-days chart (all **real data**). Prayer times are labelled as samples. |
 | `/history` | `app/(main)/history/page.tsx` | Month calendar (complete / partial / none), previous-month browsing, month totals, and a day view listing which prayers were recorded and when (**real data**) |
 | `/scan` | `app/(main)/scan/page.tsx` | "Ready to scan" screen with animated scanning state and a "How it works" guide (no real NFC) |
-| `/settings` | `app/(main)/settings/page.tsx` | Real account details (email, verified status, member since, last sign-in, sign-in method), **Log out**, prayer tracking info, NFC bracelet and About sections. Unfinished features are labelled "Coming soon" with no fake controls. |
+| `/settings` | `app/(main)/settings/page.tsx` | Real account details (email, verified status, member since, last sign-in, sign-in method), **Log out**, prayer tracking info, **NFC tag registration** (§12) and About. Unfinished features are labelled "Coming soon" with no fake controls. |
+| `/scan/{id}` | `app/(main)/scan/[id]/page.tsx` → `components/salahtrack/scan-check-in.tsx` | **NFC check-in:** checks the tag belongs to you, shows today's prayers, records a chosen prayer after confirmation (§12) |
 
 Shared code:
 
@@ -66,6 +67,16 @@ Shared code:
 | `components/salahtrack/auth-guard.tsx` | Sends the user to login if they log out in another tab or return with the Back button after logging out |
 | `components/salahtrack/settings-sections.tsx` | Settings sections: Account, Prayer tracking, NFC bracelet, About |
 | `lib/account.ts` | Loads the signed-in user's real account details and signs out |
+| `lib/use-today-prayers.ts` | Shared hook: today's checklist with load / confirm / undo. Used by the dashboard and NFC check-in. |
+| `components/salahtrack/prayer-checklist.tsx` | Shared prayer row, skeleton, load error and prayer confirmation dialog |
+| `components/salahtrack/confirm-sheet.tsx` | Generic bottom-sheet confirmation dialog (prayers, NFC tag removal) |
+| `components/salahtrack/toast.tsx` | Floating success/error message |
+| `components/salahtrack/nfc-registration.tsx` | Settings → NFC: register, copy, open, remove |
+| `components/salahtrack/check-in.tsx` | Check-in display pieces (progress, success banner, tag-not-found) |
+| `lib/nfc-tags.ts` | Reads, registers and removes the user's row in `nfc_tags`; checks that a tag is the user's own |
+| `lib/nfc-link.ts` | Pure helpers: tag-id (UUID) check and `/scan/{id}` link building |
+| `lib/safe-redirect.ts` | Shared "only redirect inside the app" check (login form and email confirm route) |
+| `supabase/schema/nfc_tags.sql` | Reference copy of the `nfc_tags` schema. **Already applied, do not run.** |
 | `components/salahtrack/ui.tsx` | Shared animation/card styles, `PageHeader`, `SampleBadge`, `InlineError`, `LoadStatus` |
 | `components/salahtrack/stats-cards.tsx` | Streak card and weekly chart card (loading / error / empty / ready states) |
 | `components/salahtrack/history-calendar.tsx` | Month calendar grid, legend and selected-day details |
@@ -238,6 +249,7 @@ prayer from that page.
 
 | Commit | Description |
 | --- | --- |
+| `a8da83c` | Record passing Settings and Log out test in PROJECT_STATUS.md |
 | `78b4c4a` | Add real account Settings page with Log out |
 | `6e8e7b3` | Record passing logged-in statistics check in PROJECT_STATUS.md |
 | `0252cac` | Add real streaks, weekly statistics and History calendar |
@@ -268,9 +280,11 @@ prayer from that page.
 9. ~~Real statistics: streak, weekly chart and History~~ ✅ (§10).
    Logged-in check passed (§10.6).
 10. ~~Settings/profile with Log out~~ ✅ (§11). Logged-in test passed (§11.5).
-11. **Further tables** as agreed with ChatGPT (e.g. NFC tags, settings), with
-    RLS on every table. Consider moving to Supabase CLI migrations.
-12. **NFC**, using the URL-on-tag approach above.
+11. ~~NFC tags table~~ ✅ (ChatGPT, §12). Further tables (e.g. settings) as
+    agreed, with RLS on every table. Consider Supabase CLI migrations.
+12. ~~NFC registration + `/scan/{id}` check-in (local)~~ ✅ (§12).
+    **Next:** owner browser test (§12.7) → deploy to an HTTPS address →
+    write the production link to a physical tag → test on iPhone and Android.
 
 ---
 
@@ -495,7 +509,7 @@ be loaded.
 | --- | --- |
 | Account | Signed-in email, verified status, member since, last signed in, sign-in method, Log out |
 | Prayer tracking | Read-only facts about how tracking works today: local prayer day (with the browser's time zone), complete-day rule, confirm-before-saving. **Coming soon:** prayer times for your location, calculation method, prayer reminders. |
-| NFC bracelet | "Coming soon" label and a short description. No buttons or fake status. |
+| NFC bracelet | Replaced in Phase 5 by real tag registration (§12.3) |
 | About SalahTrack | App description (development preview) and data privacy note |
 
 The old fake switches (reminders, Hijri date, vibration) and the fake "Guest"
@@ -525,3 +539,103 @@ account. Everything worked:
 | Browser **Back** after logging out → no SalahTrack screen shown | ✅ Passed |
 | Typing `/dashboard` while logged out → redirected to login | ✅ Passed |
 | Log back in → dashboard, statistics and History work as before | ✅ Passed |
+
+---
+
+## 12. NFC integration, Phase 5 (15 October 2026)
+
+Built and checked locally only. **Nothing has been deployed and no physical
+tag has been written.** No schema changes: `public.nfc_tags` was created by
+ChatGPT and is not recreated. The reference file is
+`supabase/schema/nfc_tags.sql` (not executed).
+
+### 12.1 How it works
+
+1. In **Settings → NFC bracelet**, the user taps **Register NFC Tag**. That
+   creates their row in `nfc_tags`. The database generates the `id` and
+   fills `user_id` from the session.
+2. Their link is `{site}/scan/{id}`, shown in full with **Copy NFC Link**
+   and **Open link** (to test in the browser).
+3. Later, that HTTPS link is written to a tag as an NDEF URL record. iPhone
+   and Android open it like any link. The browser never talks to NFC hardware
+   (iPhone Safari has no Web NFC).
+4. Opening the link → (login if needed) → tag ownership check → today's five
+   prayers → user picks a prayer → confirmation dialog → saved.
+
+### 12.2 Security model
+
+| Concern | How it's handled |
+| --- | --- |
+| A tag URL must not bypass login | `/scan/{id}` is in the protected `(main)` group. The proxy redirects logged-out visitors to `/auth/login?next=/scan/{id}`. Verified: logged-out request → **307** to `/auth/login?next=%2Fscan%2F…`. |
+| Returning to the scan URL safely | The proxy stores the path in `next`. The login form only follows it if `safeNextPath()` confirms it's inside the app (same check as the email-confirm route). Tested against 10 open-redirect tricks. |
+| Tag must belong to the user | `isMyNfcTag(id)` selects the id under RLS. Other users' tags and removed tags return no row, so both look exactly like "not found" (no information leak). Malformed ids are rejected before any query. |
+| Registering for another account | The app never sends `user_id`. The database default `auth.uid()` and the RLS insert check prevent it. |
+| One tag per user | Unique `user_id`. A duplicate insert (23505) shows "You already have a registered NFC tag" and reloads the real tag. |
+| Removing a tag | Warning dialog: "Your current NFC link will stop working straight away…". Then DELETE by id under RLS. Its `/scan/{id}` then shows "This NFC link isn't linked to your account". |
+| No automatic completion | The check-in page records nothing on load, suggests no prayer (no times, no "Up next"), and saves only after **Yes, I prayed X**. |
+| The tag id is not proof of a physical scan | Treated as a link identifier only. Nothing assumes it was physically tapped. |
+| Anonymous access | Verified while logged out: SELECT and INSERT on `nfc_tags` → **401 42501**. |
+
+### 12.3 Settings → NFC bracelet
+
+| State | What the user sees |
+| --- | --- |
+| Loading | Skeleton |
+| Load error | "Couldn't load your NFC tag" + Retry |
+| No tag | Explanation + **Register NFC Tag** ("Registering…" while saving, friendly error on failure) |
+| Registered | Date registered, the full link (wrapped and selectable), **Copy NFC Link** ("Copied" feedback; if the clipboard is blocked, the link is selected for manual copying), **Open link**, and **Remove tag** (with warning) |
+| Local link | Amber note: a localhost/http link only works on this computer; a physical tag needs the deployed HTTPS address |
+
+### 12.4 `/scan/{id}` check-in page
+
+| State | What the user sees |
+| --- | --- |
+| Checking | Skeleton (also used as the `<Suspense>` placeholder) |
+| Not your tag / removed / malformed | "This NFC link isn't linked to your account" with links to Settings and Home |
+| Check failed | "Couldn't check your NFC tag" + Retry |
+| Verified | "Your NFC tag" badge, today's progress (x of 5, five segments), the five prayers (recorded ones show **Done** and can't be undone here), "Choose it below. Nothing is saved until you confirm." |
+| After saving | "{Prayer} recorded. May Allah accept it." banner, and the progress updates straight away |
+
+**Shared saving logic:** the dashboard's load / confirm / undo code moved
+into `useTodayPrayers()` (`lib/use-today-prayers.ts`). The dashboard and
+the check-in page both use it, along with the same confirmation dialog, so
+duplicate handling, local dates and error messages are identical. The
+dashboard's behaviour and design are unchanged.
+
+### 12.5 Other changes
+
+- `lib/supabase/proxy.ts`: login redirect now includes `?next=<path>`
+  (applies to every protected page, so e.g. `/history` also returns there
+  after login).
+- `components/login-form.tsx`: after login, goes to the safe `next` path
+  (default `/dashboard`).
+- Bottom navigation highlights **Scan** on `/scan/{id}`. It is wrapped in
+  `<Suspense>` because Next.js 16 requires it for pages with a dynamic URL.
+- The `/scan` tab page itself (the demo "Start scanning" screen) is
+  unchanged. It should later be replaced with instructions that point to
+  the registered tag.
+
+### 12.6 Checks run
+
+| Check | Result |
+| --- | --- |
+| `npm test` | ✅ 49/49 (40 statistics + 9 new: `safe-redirect`, `nfc-link`) |
+| TypeScript | ✅ Pass |
+| ESLint on `app/`, `components/`, `lib/`, `proxy.ts` | ✅ Pass (`npm run lint`: only the starter's `tailwind.config.ts` issue, unchanged) |
+| Production build | ✅ Pass. `/scan/[id]` builds as a partially prerendered route. |
+| Logged-out `/scan/{id}`, `/dashboard`, `/settings` | ✅ 307 to `/auth/login?next=…` |
+| Logged-out `nfc_tags` SELECT / INSERT | ✅ 401 42501 |
+| Visual check with test data on a fresh production build (temporary page, deleted) | ✅ All NFC panel states, remove warning, check-in progress, success banner, check-in prayer rows, tag-not-found |
+
+### 12.7 Owner browser test (pending)
+
+**Restart the dev server first** (Ctrl+C, then `npm run dev`).
+
+1. Settings → NFC bracelet → **Register NFC Tag** → link appears.
+2. **Copy NFC Link** → paste it somewhere to check.
+3. **Open link** → check-in page shows "Your NFC tag" and today's prayers.
+   Record one prayer → confirm → banner + progress update. Home shows it too.
+4. Log out → paste the link into the address bar → login page → log in →
+   you're back on the check-in page.
+5. Settings → **Remove tag** → confirm → open the old link → "isn't linked to
+   your account". Register again → a **new** link is created.

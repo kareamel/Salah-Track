@@ -56,6 +56,14 @@ export async function updateSession(request: NextRequest) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
+    // Remember where they were going (e.g. an NFC link like /scan/<id>) so the
+    // login form can send them back there. The login form only accepts paths
+    // inside this app (see lib/safe-redirect.ts).
+    url.search = "";
+    url.searchParams.set(
+      "next",
+      request.nextUrl.pathname + request.nextUrl.search,
+    );
     return NextResponse.redirect(url);
   }
 

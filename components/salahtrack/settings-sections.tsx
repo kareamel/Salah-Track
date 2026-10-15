@@ -14,7 +14,6 @@ import {
   LogOut,
   MailWarning,
   MapPin,
-  Nfc,
   ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
@@ -317,33 +316,6 @@ export function PrayerTrackingSection({ timeZone }: { timeZone: string | null })
       />
       <InfoRow icon={Compass} title="Calculation method" comingSoon />
       <InfoRow icon={Bell} title="Prayer reminders" comingSoon />
-    </SettingsSection>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  NFC bracelet                                                              */
-/* -------------------------------------------------------------------------- */
-
-export function NfcSection() {
-  return (
-    <SettingsSection
-      title="NFC bracelet"
-      badge={<ComingSoonBadge />}
-      delay="delay-200"
-    >
-      <div className="flex items-start gap-4 px-5 py-5">
-        <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-stone-100 text-stone-400">
-          <Nfc className="size-6" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-medium text-stone-700">Connect your bracelet</p>
-          <p className="mt-0.5 text-sm text-stone-500">
-            Soon you&apos;ll be able to tap your SalahTrack bracelet against your
-            phone to record a prayer.
-          </p>
-        </div>
-      </div>
     </SettingsSection>
   );
 }
