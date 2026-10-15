@@ -1,6 +1,6 @@
 # SalahTrack: Project Status
 
-_Last updated: 15 October 2026 · Latest commit before this update: `b039b38`_
+_Last updated: 15 October 2026 · Latest commit before this update: `0252cac`_
 
 SalahTrack is a mobile-first, NFC-enabled Islamic prayer tracking web app.
 It is connected to the Supabase project "Salah-Track". The dashboard's daily
@@ -16,7 +16,7 @@ the prayer *times* are still samples, and they are labelled in the app.
 | --- | --- |
 | Frontend (4 screens) | ✅ Built, committed and tested at iPhone size |
 | Dashboard: today's prayers | ✅ **Real data** from `public.prayer_records` (confirm → insert, undo → delete). Code checks pass and the **logged-in test passed** (§9.4). |
-| Streak, weekly chart, History page | ✅ **Real data** (§10). 40 automated tests pass. Logged-in check by the project owner pending (§10.6). |
+| Streak, weekly chart, History page | ✅ **Real data** (§10). 40 automated tests pass. **Logged-in check passed** (§10.6). |
 | Prayer times | ⚠️ Sample times, labelled "Sample times" on the dashboard |
 | Supabase project connected | ✅ Yes: `Salah-Track`, verified 15 October 2026 |
 | Environment variables | ✅ Set in `.env.local` (Git-ignored, not committed) |
@@ -236,6 +236,7 @@ prayer from that page.
 
 | Commit | Description |
 | --- | --- |
+| `0252cac` | Add real streaks, weekly statistics and History calendar |
 | `b039b38` | Record passing logged-in test in PROJECT_STATUS.md |
 | `517762e` | Connect dashboard prayer checklist to Supabase prayer_records |
 | `8cb2a3e` | Fix auth redirects and open redirect in email confirm route |
@@ -261,7 +262,7 @@ prayer from that page.
 7. ~~Connect the dashboard's daily checklist to `prayer_records`~~ ✅ (§9)
 8. ~~Live test of the dashboard while logged in~~ ✅ (§9.4)
 9. ~~Real statistics: streak, weekly chart and History~~ ✅ (§10).
-   Logged-in visual check pending (§10.6).
+   Logged-in check passed (§10.6).
 10. **Settings/profile:** show the signed-in user instead of "Guest" and add
     a Log out button inside SalahTrack.
 11. **Further tables** as agreed with ChatGPT (e.g. NFC tags, settings), with
@@ -428,16 +429,14 @@ Tooling changes: `npm test` script added. `allowImportingTsExtensions` was
 added to `tsconfig.json` so Node can run the TypeScript tests directly.
 `eslint.config.mjs` now ignores Next.js's generated `.next/` folder.
 
-### 10.6 Not yet verified (needs a logged-in account)
+### 10.6 Logged-in check ✅ (project owner, 15 October 2026)
 
-**Restart the dev server first** (Ctrl+C, then `npm run dev`). During
-development its cache kept an outdated copy of `components/salahtrack/ui.tsx`.
-A fresh production build renders correctly.
+After restarting the dev server (its cache had kept an outdated copy of
+`components/salahtrack/ui.tsx`), the project owner checked the following with
+their real account. Everything looked right:
 
-1. Dashboard: streak and "This week" show your real numbers (with only
-   today's records: streak 0 or 1, week counted from your sign-up day).
-2. Confirm all five prayers today → streak becomes at least 1 and the
-   message says today is complete. Undo one → it goes back straight away.
-3. History: today is highlighted. Days you recorded show green or light
-   green. Tap a day to see its prayers. The previous-month button is
-   disabled in your sign-up month.
+| Item | Result |
+| --- | --- |
+| Dashboard streak card (current + best) | ✅ Passed |
+| Dashboard "This week" chart and numbers | ✅ Passed |
+| History calendar (days, month browsing, day details) | ✅ Passed |
