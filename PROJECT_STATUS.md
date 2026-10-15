@@ -1,9 +1,10 @@
 # SalahTrack: Project Status
 
-_Last updated: 15 October 2026 · Latest commit: `8adc6ef`_
+_Last updated: 15 October 2026 · Latest commit before this update: `6f994d2`_
 
 SalahTrack is a mobile-first, NFC-enabled Islamic prayer tracking web app.
-The frontend is built and runs on sample data. **Supabase is not connected yet.**
+The frontend is built and runs on sample data. **The app is now connected to
+the Supabase project "Salah-Track"** (verified). No database tables exist yet.
 
 ---
 
@@ -13,10 +14,11 @@ The frontend is built and runs on sample data. **Supabase is not connected yet.*
 | --- | --- |
 | Frontend (4 screens) | ✅ Built, committed and tested at iPhone size |
 | Data | ⚠️ Sample data only (`lib/demo-data.ts`), nothing is saved |
-| Supabase project connected | ❌ No: no project URL or key configured |
-| Environment variables | ❌ Not set (only `.env.example` exists) |
-| Authentication | 🟡 Starter auth code exists but is **inactive** until Supabase is connected |
-| Database tables | ❌ None yet |
+| Supabase project connected | ✅ Yes: `Salah-Track`, verified 15 October 2026 |
+| Environment variables | ✅ Set in `.env.local` (Git-ignored, not committed) |
+| Authentication | 🟡 Active (starter email + password flow), **not yet tested with a real account**. Redirect fixes are pending (see §5). |
+| App pages while logged out | ⚠️ Redirect to `/auth/login` (expected, see §5.1) |
+| Database tables | ❌ None yet (intentional) |
 | NFC | ❌ Not started (Scan screen is visual only) |
 
 ---
@@ -29,8 +31,8 @@ The frontend is built and runs on sample data. **Supabase is not connected yet.*
 | React | 19 |
 | TypeScript | 5 |
 | Tailwind CSS (+ `tailwindcss-animate`) | 3.4 |
-| `@supabase/supabase-js` | 2.118.0 (installed) |
-| `@supabase/ssr` | 0.12.7 (installed) |
+| `@supabase/supabase-js` | 2.118.0 |
+| `@supabase/ssr` | 0.12.7 |
 | Icons | `lucide-react` (came with the starter) |
 
 Platform: Windows 11, local development at `http://localhost:3000`.
@@ -71,7 +73,69 @@ Behaviour notes:
 
 ## 4. Supabase status (verified 15 October 2026)
 
-### 4.1 Supabase client code: present (from the starter template)
+### 4.1 Project
+
+| Item | Value |
+| --- | --- |
+| Project name | Salah-Track |
+| Project URL | `https://kppyinaagomddmfcyjrt.supabase.co` |
+| Region | eu-west-1 |
+| Status | Active |
+
+### 4.2 Environment variables
+
+Stored in `.env.local` in the project root. Values are not reproduced here.
+
+| Variable | Status |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ Set to the project URL above |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | ✅ Set. Verified to be a **publishable** key (`sb_publishable_` format, no stray spaces or quotes). |
+| Secret / `service_role` key | ✅ **Not used anywhere** in the project |
+
+| Safety check | Result |
+| --- | --- |
+| `.env.local` is Git-ignored | ✅ Yes (`.gitignore` line 34: `.env*.local`); `git status` does not list it |
+| Credentials committed to Git | ✅ None |
+| Credentials printed in logs or reports | ✅ None (all checks reported only the key type and length) |
+
+### 4.3 Connectivity tests
+
+Run from the project folder using the values in `.env.local`:
+
+| Test | Result | Meaning |
+| --- | --- | --- |
+| `GET /auth/v1/health` without a key | 401 | Project exists and requires an API key |
+| `GET /auth/v1/settings` with the publishable key | ✅ 200 | The key is accepted by **this** project |
+| Same request with a fake key (control test) | 401 | Confirms the 200 above is real |
+| `GET /rest/v1/<missing table>` with the publishable key | 404 `PGRST205` "Could not find the table" | Database API reachable. The error is expected because no tables exist yet. |
+| `GET /rest/v1/` (schema listing) with the publishable key | 401 "Secret API key required" | Expected. Supabase only lets secret keys list the whole schema. |
+
+Auth settings reported by the project:
+
+| Setting | Value |
+| --- | --- |
+| Email provider | Enabled |
+| Sign-ups | Allowed |
+| Email confirmation | Required (`mailer_autoconfirm: false`) |
+
+### 4.4 Running app
+
+The dev server picked up `.env.local` automatically ("Reload env: .env.local"
+in the Next.js log), so no restart was needed.
+
+| Page | Result |
+| --- | --- |
+| `/` (starter home) | ✅ 200. "Environment variables required" warning gone, **Sign in** link shown. |
+| `/auth/login`, `/auth/sign-up` | ✅ 200, forms render |
+| `/dashboard`, `/history`, `/scan`, `/settings` | ↪️ Redirect to `/auth/login` (expected, §5.1) |
+| `/protected` | ↪️ Redirect to `/auth/login` (expected) |
+| Browser console | ✅ No errors |
+
+The four SalahTrack screens themselves are unchanged and were last checked
+working before Supabase was connected. They can't be viewed again until login
+works or they are made public.
+
+### 4.5 Supabase code in the project (from the starter template)
 
 | File | Purpose |
 | --- | --- |
@@ -79,39 +143,12 @@ Behaviour notes:
 | `lib/supabase/server.ts` | Server client (`createServerClient`, cookie-based) |
 | `lib/supabase/proxy.ts` | Refreshes the session on each request and redirects logged-out users |
 | `proxy.ts` | Next.js 16 proxy (formerly "middleware") that calls `updateSession` on all routes except static files |
-| `lib/utils.ts` | `hasEnvVars` check: Supabase features switch off when env vars are missing |
+| `lib/utils.ts` | `hasEnvVars` check: Supabase features switch on now that both variables are set |
 
-The client code reads exactly two variables:
+Database tables: none. There is no `supabase/` folder (no Supabase CLI
+migrations yet).
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-
-### 4.2 Environment variables: not configured
-
-| Check | Result |
-| --- | --- |
-| `.env.local` / `.env` / other `.env.*` files | Not present |
-| `.env.example` | Present, contains placeholders only |
-| Variables in the shell / Windows user / Windows system environment | Not set |
-| Any `.env` file ever committed to Git | No (only `.env.example`) |
-| `.gitignore` excludes `.env` and `.env*.local` | Yes |
-
-No credentials were found, so none could be exposed.
-
-### 4.3 Connected Supabase project: none
-
-- With no URL or key, the app cannot reach any Supabase project. A live
-  connection test was not possible.
-- The running app confirms this: the starter home page (`/`) shows
-  "Supabase environment variables required".
-- There is no `supabase/` folder (no Supabase CLI project, migrations or
-  local config).
-- Database tables: none created.
-
-### 4.4 Authentication: code present, inactive
-
-The starter includes a complete email + password flow. It is **not active**
-because Supabase is not connected.
+### 4.6 Authentication flows (starter, now active, untested)
 
 | Feature | Location | Supabase call |
 | --- | --- | --- |
@@ -123,34 +160,34 @@ because Supabase is not connected.
 | Example protected page | `app/protected` | `auth.getClaims` |
 | Route protection | `lib/supabase/proxy.ts` | `auth.getClaims` |
 
-Settings on the Supabase dashboard (email provider, Site URL, redirect URLs,
-email templates) can't be checked until a project exists.
+No account has been created yet. Account sign-up testing is deliberately on
+hold until the redirect issues in §5 are fixed.
 
 ---
 
-## 5. Things to know before connecting Supabase
+## 5. Open issues to fix before testing sign-up
 
-1. **The app pages will require login straight away.** Once the env vars are
-   set, `lib/supabase/proxy.ts` redirects logged-out visitors to
-   `/auth/login` on every route except `/` and `/auth/*`. That includes
-   `/dashboard`, `/history`, `/scan` and `/settings`. Plan the auth step with
-   this in mind, or decide which routes should stay public.
-2. **After sign-up, users land on the starter's `/protected` page.**
-   `emailRedirectTo` in `components/sign-up-form.tsx` points there. It should
-   point to `/dashboard` later.
-3. **Possible open redirect in the starter.** `app/auth/confirm/route.ts`
-   redirects to the `next` query value without checking it, so a crafted
-   confirmation link could send users to another website. Restrict `next` to
-   paths inside the app when working on authentication.
-4. **Only use the publishable (anon) key in the app.** Variables starting with
-   `NEXT_PUBLIC_` are visible in the browser. The `service_role` key must
-   never be given a `NEXT_PUBLIC_` name or used in client code. Every table
-   will need **Row Level Security** turned on with per-user policies.
-5. **Unpinned versions.** `package.json` uses `"latest"` for `next`,
-   `@supabase/supabase-js` and `@supabase/ssr`. Consider pinning them so a
-   fresh install doesn't pull in breaking changes.
-6. **No Git remote.** The repository exists only on this computer
+1. **App pages require login.** `lib/supabase/proxy.ts` redirects logged-out
+   visitors to `/auth/login` on every route except `/` and `/auth/*`. This is
+   now **active**. Decide which pages should be public and which need an
+   account.
+2. **Sign-up lands on the starter page.** `emailRedirectTo` in
+   `components/sign-up-form.tsx` points to `/protected`. It should point to
+   `/dashboard`.
+3. **Open redirect in the starter.** `app/auth/confirm/route.ts` redirects to
+   the `next` query value without checking it. Restrict it to paths inside
+   the app.
+4. **Supabase dashboard URL settings.** Set **Site URL** and **Redirect URLs**
+   (Authentication → URL Configuration) to include `http://localhost:3000`
+   before testing confirmation emails.
+5. **Key and table security.** Only the publishable key is used in the app
+   (✅). Every future table needs **Row Level Security** turned on, with
+   per-user policies.
+6. **Unpinned versions.** `package.json` uses `"latest"` for `next`,
+   `@supabase/supabase-js` and `@supabase/ssr`. Consider pinning them.
+7. **No Git remote.** The repository exists only on this computer
    (branch `master`). Consider pushing to a private GitHub repo as a backup.
+   `.env.local` will stay out of it automatically.
 
 ---
 
@@ -169,6 +206,7 @@ prayer from that page.
 
 | Commit | Description |
 | --- | --- |
+| `6f994d2` | Add PROJECT_STATUS.md with Supabase verification findings |
 | `8adc6ef` | Add working bottom navigation with History, Scan and Settings pages |
 | `0a90dbd` | Add SalahTrack dashboard with demo data |
 | `b943e8b` | Initial commit from Create Next App |
@@ -177,21 +215,17 @@ prayer from that page.
 
 ## 8. Suggested next steps
 
-Order follows the plan: database → authentication → NFC.
-
-1. **Create a Supabase project** at supabase.com (user action).
-2. **Create `.env.local`** from `.env.example` with the project URL and
-   publishable key (user action, never committed). Restart `npm run dev`.
-3. **Verify connectivity.** The starter home page should switch from
-   "environment variables required" to the sign-in buttons. `/dashboard` will
-   now redirect to login (expected, see §5.1).
-4. **Agree on the database design** (with ChatGPT), e.g. profiles, prayer
+1. ~~Create a Supabase project~~ ✅
+2. ~~Create `.env.local` with URL and publishable key~~ ✅
+3. ~~Verify connectivity~~ ✅
+4. **Fix the auth redirects (§5.1 to §5.4):** choose public vs. protected
+   pages, point sign-up to `/dashboard`, validate the `next` redirect, and
+   set Site URL / Redirect URLs in the Supabase dashboard.
+5. **Test sign-up, email confirmation, login and logout** with a real account.
+6. **Agree on the database design** (with ChatGPT), e.g. profiles, prayer
    logs (user, date, prayer, confirmed at, source: button/NFC), NFC tags and
    settings, with Row Level Security on every table. Consider keeping the
    schema as SQL migrations with the Supabase CLI.
-5. **Authentication step:** decide which pages are public, point sign-up to
-   `/dashboard`, fix the `next` redirect check, and set Site URL / redirect
-   URLs in the Supabase dashboard.
-6. **Replace `lib/demo-data.ts`** with real reads and writes, one screen at a
+7. **Replace `lib/demo-data.ts`** with real reads and writes, one screen at a
    time, starting with the dashboard confirmations.
-7. **NFC**, using the URL-on-tag approach above.
+8. **NFC**, using the URL-on-tag approach above.
