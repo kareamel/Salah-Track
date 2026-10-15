@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AuthGuard } from "@/components/salahtrack/auth-guard";
 import { BottomNav } from "@/components/salahtrack/bottom-nav";
 
 export const metadata: Metadata = {
@@ -27,6 +28,7 @@ export default function MainLayout({
       </main>
 
       <BottomNav />
+      <AuthGuard />
     </div>
   );
 }

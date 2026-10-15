@@ -1,6 +1,6 @@
 # SalahTrack: Project Status
 
-_Last updated: 15 October 2026 · Latest commit before this update: `0252cac`_
+_Last updated: 15 October 2026 · Latest commit before this update: `6e8e7b3`_
 
 SalahTrack is a mobile-first, NFC-enabled Islamic prayer tracking web app.
 It is connected to the Supabase project "Salah-Track". The dashboard's daily
@@ -20,10 +20,11 @@ the prayer *times* are still samples, and they are labelled in the app.
 | Prayer times | ⚠️ Sample times, labelled "Sample times" on the dashboard |
 | Supabase project connected | ✅ Yes: `Salah-Track`, verified 15 October 2026 |
 | Environment variables | ✅ Set in `.env.local` (Git-ignored, not committed) |
-| Authentication | ✅ Active (email + password). Redirect fixes are done (§5). Login, logout and log back in verified with a real account (§9.4). |
+| Authentication | ✅ Active (email + password). Redirect fixes are done (§5). Login, logout and log back in verified with a real account (§9.4). **Log out button in Settings** (§11). |
 | App pages while logged out | ↪️ Redirect to `/auth/login` (intended) |
 | Database tables | ✅ `public.prayer_records`, created by ChatGPT, RLS on (§9) |
-| NFC | ❌ Not started (Scan screen is visual only) |
+| Settings / profile | ✅ Real account details and a working Log out (§11). Logged-in check by the project owner pending (§11.5). |
+| NFC | ❌ Not started (Scan screen is visual only; Settings shows the NFC bracelet as "Coming soon") |
 
 ---
 
@@ -54,7 +55,7 @@ does not appear in URLs.
 | `/dashboard` | `app/(main)/dashboard/page.tsx` | Greeting, Gregorian + Hijri date, progress ring (x/5), five prayers with Confirm/Done buttons and confirmation dialog, real current/best streak, real last-7-days chart (all **real data**). Prayer times are labelled as samples. |
 | `/history` | `app/(main)/history/page.tsx` | Month calendar (complete / partial / none), previous-month browsing, month totals, and a day view listing which prayers were recorded and when (**real data**) |
 | `/scan` | `app/(main)/scan/page.tsx` | "Ready to scan" screen with animated scanning state and a "How it works" guide (no real NFC) |
-| `/settings` | `app/(main)/settings/page.tsx` | Guest profile card, reminder/Hijri/vibration switches, calculation method, version (not saved) |
+| `/settings` | `app/(main)/settings/page.tsx` | Real account details (email, verified status, member since, last sign-in, sign-in method), **Log out**, prayer tracking info, NFC bracelet and About sections. Unfinished features are labelled "Coming soon" with no fake controls. |
 
 Shared code:
 
@@ -62,6 +63,9 @@ Shared code:
 | --- | --- |
 | `app/(main)/layout.tsx` | Shared background, page width and bottom nav; sets page title "SalahTrack" |
 | `components/salahtrack/bottom-nav.tsx` | Bottom navigation (Home, History, Scan, Settings) with active-tab highlight |
+| `components/salahtrack/auth-guard.tsx` | Sends the user to login if they log out in another tab or return with the Back button after logging out |
+| `components/salahtrack/settings-sections.tsx` | Settings sections: Account, Prayer tracking, NFC bracelet, About |
+| `lib/account.ts` | Loads the signed-in user's real account details and signs out |
 | `components/salahtrack/ui.tsx` | Shared animation/card styles, `PageHeader`, `SampleBadge`, `InlineError`, `LoadStatus` |
 | `components/salahtrack/stats-cards.tsx` | Streak card and weekly chart card (loading / error / empty / ready states) |
 | `components/salahtrack/history-calendar.tsx` | Month calendar grid, legend and selected-day details |
@@ -80,9 +84,7 @@ Behaviour notes:
   Supabase. Settings switches and the scan button are still visual only.
 - Prayer times are fixed sample values, not calculated for a location. They
   are labelled "Sample times" on the dashboard.
-- Settings still shows a "Guest" profile card even when logged in, and the
-  SalahTrack screens have no Log out button yet. Log out from the starter
-  home page (`/`).
+- Settings shows the signed-in account and has a Log out button (§11).
 - The starter's home page (`/`) and root layout metadata were left unchanged.
 
 ---
@@ -236,6 +238,7 @@ prayer from that page.
 
 | Commit | Description |
 | --- | --- |
+| `6e8e7b3` | Record passing logged-in statistics check in PROJECT_STATUS.md |
 | `0252cac` | Add real streaks, weekly statistics and History calendar |
 | `b039b38` | Record passing logged-in test in PROJECT_STATUS.md |
 | `517762e` | Connect dashboard prayer checklist to Supabase prayer_records |
@@ -263,8 +266,7 @@ prayer from that page.
 8. ~~Live test of the dashboard while logged in~~ ✅ (§9.4)
 9. ~~Real statistics: streak, weekly chart and History~~ ✅ (§10).
    Logged-in check passed (§10.6).
-10. **Settings/profile:** show the signed-in user instead of "Guest" and add
-    a Log out button inside SalahTrack.
+10. ~~Settings/profile with Log out~~ ✅ (§11). Logged-in check pending (§11.5).
 11. **Further tables** as agreed with ChatGPT (e.g. NFC tags, settings), with
     RLS on every table. Consider moving to Supabase CLI migrations.
 12. **NFC**, using the URL-on-tag approach above.
@@ -440,3 +442,84 @@ their real account. Everything looked right:
 | Dashboard streak card (current + best) | ✅ Passed |
 | Dashboard "This week" chart and numbers | ✅ Passed |
 | History calendar (days, month browsing, day details) | ✅ Passed |
+
+---
+
+## 11. Settings, profile and Log out (15 October 2026)
+
+No new tables or schema changes. Uses the existing browser Supabase client
+and session.
+
+### 11.1 Account information (real data only)
+
+Loaded with `supabase.auth.getUser()`, which is checked with the Supabase
+server, not just read from the browser (`lib/account.ts`):
+
+| Shown | Source |
+| --- | --- |
+| Email address | `user.email` |
+| Email verified / not verified | `user.email_confirmed_at` |
+| Member since | `user.created_at` |
+| Last signed in | `user.last_sign_in_at` |
+| Sign-in method | `user.app_metadata.provider` ("email" → "Email and password") |
+| Avatar | First letter of the email address (no photo or name is invented) |
+
+Missing fields are left out rather than filled with placeholders. There is a
+loading skeleton while the account loads, and a Retry message if it can't
+be loaded.
+
+### 11.2 Log out
+
+- **Log out** button in the Account section. It shows "Logging out…" while
+  working, and a friendly message if logging out fails. It's available even
+  if the account details failed to load.
+- It uses the same `supabase.auth.signOut()` call as the starter's
+  LogoutButton, then does a **full page load** of `/auth/login` (with
+  `window.location.replace`). This clears every page and piece of data kept
+  in memory, and the Settings page isn't left in the Back history.
+- **Protected screens after logout:**
+  - Server: `proxy.ts` already redirects every `(main)` page to
+    `/auth/login` without a session. Verified while logged out:
+    `/dashboard`, `/history`, `/scan` and `/settings` → `/auth/login`.
+  - Browser: the new `AuthGuard` (in `app/(main)/layout.tsx`) sends the
+    user to login when Supabase reports `SIGNED_OUT` (e.g. logging out in
+    another tab). It also does this when a page is restored from the
+    browser's back/forward memory without a session.
+  - Data: even if a stale screen were shown, Row Level Security returns no
+    data without a session.
+
+### 11.3 Settings sections
+
+| Section | Contents |
+| --- | --- |
+| Account | Signed-in email, verified status, member since, last signed in, sign-in method, Log out |
+| Prayer tracking | Read-only facts about how tracking works today: local prayer day (with the browser's time zone), complete-day rule, confirm-before-saving. **Coming soon:** prayer times for your location, calculation method, prayer reminders. |
+| NFC bracelet | "Coming soon" label and a short description. No buttons or fake status. |
+| About SalahTrack | App description (development preview) and data privacy note |
+
+The old fake switches (reminders, Hijri date, vibration) and the fake "Guest"
+card were removed. Unfinished features are plain rows with a "Coming soon"
+label. They are not switches or buttons.
+
+### 11.4 Checks run
+
+| Check | Result |
+| --- | --- |
+| TypeScript | ✅ Pass |
+| ESLint on `app/`, `components/`, `lib/`, `proxy.ts` | ✅ Pass |
+| Production build | ✅ Pass (18 pages) |
+| `npm test` | ✅ 40/40 (statistics unchanged) |
+| Logged-out access to the 4 app pages | ✅ All redirect to `/auth/login` |
+| Visual check with test data on a fresh production build (temporary preview page, deleted before commit) | ✅ Verified and unverified email, long email (truncates), loading, load error, logout error, "Logging out…", Coming soon rows, NFC and About sections. Long values use a stacked label/value layout so nothing is squeezed. |
+
+### 11.5 Not yet verified (needs a logged-in account)
+
+**Restart the dev server first** (Ctrl+C, then `npm run dev`), because
+`components/salahtrack/ui.tsx` changed again.
+
+1. Settings shows your real email, verified status and dates.
+2. Tap **Log out** → you land on the login page.
+3. Press the browser's **Back** button → you stay on (or return to) the
+   login page. No SalahTrack screen is shown.
+4. Type `/dashboard` in the address bar → redirected to login.
+5. Log back in → dashboard, statistics and History work as before.

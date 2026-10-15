@@ -21,6 +21,15 @@ export function SampleBadge({ children = "Sample data" }: { children?: string })
   );
 }
 
+// Label for features that aren't available yet.
+export function ComingSoonBadge() {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-stone-500 ring-1 ring-stone-200">
+      Coming soon
+    </span>
+  );
+}
+
 // Compact "couldn't load" message with a retry button, for use inside cards.
 export function InlineError({
   message,
