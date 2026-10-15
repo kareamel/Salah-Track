@@ -1,6 +1,6 @@
 # SalahTrack: Project Status
 
-_Last updated: 15 October 2026 · Latest commit before this update: `8cb2a3e`_
+_Last updated: 15 October 2026 · Latest commit before this update: `517762e`_
 
 SalahTrack is a mobile-first, NFC-enabled Islamic prayer tracking web app.
 It is connected to the Supabase project "Salah-Track". **The dashboard's
@@ -15,11 +15,11 @@ clearly labelled sample data.
 | Area | Status |
 | --- | --- |
 | Frontend (4 screens) | ✅ Built, committed and tested at iPhone size |
-| Dashboard: today's prayers | ✅ **Real data** from `public.prayer_records` (confirm → insert, undo → delete). Code checks pass; **live logged-in test pending** (§9). |
+| Dashboard: today's prayers | ✅ **Real data** from `public.prayer_records` (confirm → insert, undo → delete). Code checks pass and the **logged-in test passed** (§9.4). |
 | Streak, weekly chart, History page | ⚠️ Sample data, labelled "Sample data" in the app |
 | Supabase project connected | ✅ Yes: `Salah-Track`, verified 15 October 2026 |
 | Environment variables | ✅ Set in `.env.local` (Git-ignored, not committed) |
-| Authentication | 🟡 Active (email + password). Redirect fixes are done (§5). Real-account test pending. |
+| Authentication | ✅ Active (email + password). Redirect fixes are done (§5). Login, logout and log back in verified with a real account (§9.4). |
 | App pages while logged out | ↪️ Redirect to `/auth/login` (intended) |
 | Database tables | ✅ `public.prayer_records`, created by ChatGPT, RLS on (§9) |
 | NFC | ❌ Not started (Scan screen is visual only) |
@@ -229,6 +229,7 @@ prayer from that page.
 
 | Commit | Description |
 | --- | --- |
+| `517762e` | Connect dashboard prayer checklist to Supabase prayer_records |
 | `8cb2a3e` | Fix auth redirects and open redirect in email confirm route |
 | `dd7d7e9` | Update PROJECT_STATUS.md with verified Supabase connection |
 | `6f994d2` | Add PROJECT_STATUS.md with Supabase verification findings |
@@ -250,7 +251,7 @@ prayer from that page.
    → log in → `/dashboard`.
 6. ~~Create the first table (`prayer_records`)~~ ✅ (ChatGPT, §9)
 7. ~~Connect the dashboard's daily checklist to `prayer_records`~~ ✅ (§9)
-8. **Live test of the dashboard while logged in** (project owner, §9.4).
+8. ~~Live test of the dashboard while logged in~~ ✅ (§9.4)
 9. **Real statistics:** streak, weekly chart and History from
    `prayer_records`, replacing `lib/demo-data.ts`.
 10. **Settings/profile:** show the signed-in user instead of "Guest" and add
@@ -310,17 +311,19 @@ Checked from outside with the publishable key (no login):
 | Logged-out access to `/dashboard`, `/history` | ↪️ `/auth/login` (intended) |
 | Dev server log | ✅ No errors |
 
-### 9.4 Not yet verified (needs a logged-in account)
+### 9.4 Logged-in end-to-end test ✅ (project owner, 15 October 2026)
 
-The assistant cannot create accounts or sign in, so the end-to-end flow must
-be tested by the project owner:
+The assistant cannot create accounts or sign in, so the project owner ran
+this test with their real account:
 
-1. Log in → `/dashboard` shows 0 of 5 (the database has no records yet).
-2. Tap **Confirm** on Fajr → dialog → **Yes** → Fajr turns green, 1 of 5.
-3. Refresh the page → Fajr is still green.
-4. Log out (from `/`) and log back in → Fajr is still green.
-5. Tap **Done** on Fajr → **Remove record** → back to 0 of 5. Refresh to confirm.
-6. Optional: confirm Fajr in two tabs → the second shows the friendly
-   duplicate message.
-7. Optional: check the Supabase dashboard (Table Editor → `prayer_records`)
-   for the row and its `prayer_date`.
+| Step | Result |
+| --- | --- |
+| Log in → `/dashboard` | ✅ Passed |
+| Confirm a prayer → dialog → **Yes** → turns green | ✅ Passed |
+| Refresh the page → still completed | ✅ Passed |
+| Log out and log back in → still completed | ✅ Passed |
+| Undo (**Done** → **Remove record**) → record deleted | ✅ Passed |
+
+Not explicitly tested yet (optional): the duplicate message from two tabs,
+the network-error message, and checking the row's `prayer_date` in the
+Supabase Table Editor.
